@@ -56,6 +56,10 @@ body.recording .rec-timer{display:block}
 border-top:1px solid rgba(255,0,255,0.1);border-bottom:1px solid rgba(255,0,255,0.1)}
 #horizon-line{left:0;right:0;height:1px;background:rgba(255,180,0,0.4)}
 #scan-line{top:0;bottom:0;width:2px;background:rgba(255,0,255,0.6);z-index:10;transition:box-shadow .1s}
+.scan-extra{top:0;bottom:0;width:1px;z-index:9;display:none}
+#scan-line-l{background:rgba(100,180,255,0.35)}
+#scan-line-r{background:rgba(255,180,100,0.35)}
+body.multi-line .scan-extra{display:block}
 #note-indicators{top:0;bottom:0;width:80px;z-index:10}
 
 .note-row{position:absolute;left:0;transform:translateY(-50%);
@@ -145,6 +149,8 @@ border-right:1px solid rgba(255,0,255,.1);transition:background .15s,color .15s}
   <div id="safe-zone" class="overlay running-only"></div>
   <div id="horizon-line" class="overlay running-only"></div>
   <div id="scan-line" class="overlay running-only"></div>
+  <div id="scan-line-l" class="overlay running-only scan-extra"></div>
+  <div id="scan-line-r" class="overlay running-only scan-extra"></div>
   <div id="note-indicators" class="overlay running-only"></div>
   <div id="label-top" class="overlay running-only">scan line instrument</div>
   <div id="label-safe" class="overlay running-only">safe zone ▾</div>
@@ -160,6 +166,22 @@ border-right:1px solid rgba(255,0,255,.1);transition:background .15s,color .15s}
           <div class="setting-hint">Edge contrast detection, no horizon</div>
         </div>
         <label class="toggle"><input type="checkbox" id="opt-indoor">
+          <div class="track"></div><div class="thumb"></div></label>
+      </div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-name">Multi-Line</div>
+          <div class="setting-hint">3 scan lines → low / mid / high register</div>
+        </div>
+        <label class="toggle"><input type="checkbox" id="opt-multi">
+          <div class="track"></div><div class="thumb"></div></label>
+      </div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-name">Depth Sense</div>
+          <div class="setting-hint">Sharp edges = close/loud, soft = far/reverb</div>
+        </div>
+        <label class="toggle"><input type="checkbox" id="opt-depth" checked>
           <div class="track"></div><div class="thumb"></div></label>
       </div>
     </div>
@@ -279,12 +301,17 @@ const noteLabels=SCALE.map(s=>s.note);
 const coolLabels=["F2","Bb2","C3","Eb3","F3","Ab3","Bb3","C4","Eb4","F4","Ab4","Bb4","C5","Eb5","F5"];
 
 const DRONE_BASE=87.31, SCAN_X=0.62, SAFE_TOP=0.28, SAFE_BOT=0.72;
+const SCAN_L=0.28, SCAN_R=0.88; // flanking line positions
 const PW=320, PH=240, HORIZON_SM=0.91, BG_RATE=0.008;
 const SCAN_COLS=5;
+// Voice-to-line mapping: L=low, M=mid, R=high
+const VOICE_L=[0,1,2,3,4], VOICE_M=[5,6,7,8,9], VOICE_R=[10,11,12,13,14];
 
 // ── Settings (live-read each frame) ────────────────────────────
 const opt = {
   get indoor()   { return document.getElementById("opt-indoor").checked },
+  get multi()    { return document.getElementById("opt-multi").checked },
+  get depth()    { return document.getElementById("opt-depth").checked },
   get droneMode() {
     const active=document.querySelector("#drone-mode-ctrl .seg-active");
     return active?active.dataset.val:"reactive";
@@ -310,6 +337,10 @@ let smoothEnergyCoM=0.5; // indoor: energy center-of-mass for drone
 let zoneMeans=new Array(SCALE.length).fill(128); // for indoor edge detection
 let sceneWarmth=0.65; // 0=cool, 1=warm, starts slightly warm
 let currentFreqs=SCALE.map(s=>s.freq); // live frequencies (lerped by warmth)
+let multiEnergiesL=new Array(SCALE.length).fill(0);
+let multiEnergiesR=new Array(SCALE.length).fill(0);
+let prevColLumL=null, prevColLumR=null;
+let zoneSharpness=new Array(SCALE.length).fill(0.5); // depth: 0=blurry/far, 1=sharp/close
 
 // ── DOM ────────────────────────────────────────────────────────
 const videoEl=document.getElementById("video-el");
@@ -321,6 +352,8 @@ const sLine=document.getElementById("scan-line");
 const noteCont=document.getElementById("note-indicators");
 const labelS=document.getElementById("label-safe");
 const safeZone=document.getElementById("safe-zone");
+const sLineL=document.getElementById("scan-line-l");
+const sLineR=document.getElementById("scan-line-r");
 
 procC.width=PW;procC.height=PH;
 const pCtx=procC.getContext("2d",{willReadFrequently:true});
@@ -329,6 +362,8 @@ const glCtx=glowC.getContext("2d");
 
 document.getElementById("safe-zone").style.cssText=`top:${SAFE_TOP*100}%;height:${(SAFE_BOT-SAFE_TOP)*100}%`;
 sLine.style.left=(SCAN_X*100)+"%";
+sLineL.style.left=(SCAN_L*100)+"%";
+sLineR.style.left=(SCAN_R*100)+"%";
 noteCont.style.left="calc("+(SCAN_X*100)+"% + 10px)";
 labelS.style.top="calc("+(SAFE_TOP*100)+"% - 16px)";
 
@@ -744,6 +779,50 @@ function sampleScanIndoor(d,w,h,nZ){
   for(let z=0;z<nZ;z++) zoneMeans[z]=means[z];
 
   return{energies,hues,sats};
+}
+
+// ── Lightweight column sampler for flanking lines ──────────────
+function sampleFlankColumn(d,w,h,nZ,scanX,prevLum){
+  const p=d.data,cx=Math.floor(w*scanX),zH=h/nZ;
+  const energies=[],colL=[];
+  const sens=0.3+opt.sens*1.4, thr=2+8*(1-opt.sens);
+  for(let z=0;z<nZ;z++){
+    const yS=Math.floor(z*zH),yE=Math.floor((z+1)*zH);
+    let ls=0,lsq=0,cnt=0;
+    for(let y=yS;y<yE&&y<h;y++){
+      const i=(y*w+cx)*4;
+      const l=lum(p[i],p[i+1],p[i+2]);
+      ls+=l;lsq+=l*l;cnt++;
+    }
+    const mean=ls/cnt,std=Math.sqrt(Math.max(0,lsq/cnt-mean*mean));
+    const zL=mean;colL.push(zL);
+    const tD=prevLum?Math.abs(zL-prevLum[z]):0;
+    const raw=(std*0.5+tD*1.0)*sens;
+    energies.push(Math.max(0,raw-thr));
+  }
+  return{energies,colLum:colL};
+}
+
+// ── Depth estimation (per-zone sharpness) ──────────────────────
+function estimateDepth(d,w,h,nZ,scanX){
+  // Measures high-frequency content at scan column — proxy for sharpness/closeness
+  const p=d.data,cx=Math.floor(w*scanX),zH=h/nZ;
+  const sharpness=[];
+  for(let z=0;z<nZ;z++){
+    const yS=Math.floor(z*zH),yE=Math.floor((z+1)*zH);
+    let gradSum=0,cnt=0,prevL=0;
+    for(let y=yS;y<yE&&y<h;y++){
+      const i=(y*w+cx)*4;
+      const l=lum(p[i],p[i+1],p[i+2]);
+      if(y>yS){gradSum+=Math.abs(l-prevL);cnt++;}
+      prevL=l;
+    }
+    // Normalize: avg gradient per pixel row. Higher = sharper = closer.
+    const avgGrad=cnt>0?gradSum/cnt:0;
+    // Map to 0-1 range. ~10+ avg gradient is very sharp, ~2 is blurry.
+    sharpness.push(Math.min(1,avgGrad/12));
+  }
+  return sharpness;
 }
 
 // ── Glow ───────────────────────────────────────────────────────
