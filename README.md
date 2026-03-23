@@ -6,6 +6,9 @@ A browser-based instrument that turns your phone’s camera into a real-time mus
 
 -----
 
+## Inspired by this Instagram Post
+<https://www.instagram.com/reel/DWCKRd-COrf/?igsh=MTQ1NW5sb29oZXQ4NA==/>
+
 ## How It Works
 
 The core idea is simple: a fixed vertical line in the camera frame acts as a one-dimensional sensor. As you walk or pan, the world scrolls past it. The system samples that column of pixels every frame (~30fps) and maps what it sees to sound.
