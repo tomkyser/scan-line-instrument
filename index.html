@@ -237,6 +237,7 @@ let audio=null, stream=null, raf=null;
 let bgModel=[], smoothHorizon=0.5;
 let smoothEnergies=new Array(SCALE.length).fill(0);
 let globalEnergy=0, prevColLum=null, prevColDelta=null;
+let pluckCooldown=new Array(SCALE.length).fill(0);
 let zoneHue=new Array(SCALE.length).fill(0);
 let zoneSat=new Array(SCALE.length).fill(0);
 
@@ -382,56 +383,86 @@ function buildAudio(){
   });
   padG.connect(padF);padF.connect(dry);padF.connect(reverb);
 
-  // ── Pluck engine ──
-  // Pre-allocate a pool of pluck voices that get triggered one-shot style
-  const PLUCK_POOL=8;
-  const pluckVoices=[];
-  for(let i=0;i<PLUCK_POOL;i++){
-    const osc=ctx.createOscillator();osc.type="sine";osc.frequency.value=440;
-    // Pluck uses sharp bandpass for bell character
-    const bp=ctx.createBiquadFilter();bp.type="bandpass";bp.frequency.value=440;bp.Q.value=3;
-    const gain=ctx.createGain();gain.gain.value=0;
-    // Noise burst for attack transient
-    const noiseLen=ctx.sampleRate*0.04;
-    const noiseBuf=ctx.createBuffer(1,noiseLen,ctx.sampleRate);
-    const nd=noiseBuf.getChannelData(0);
-    for(let j=0;j<noiseLen;j++) nd[j]=(Math.random()*2-1)*Math.pow(1-j/noiseLen,8);
-
-    osc.connect(bp);bp.connect(gain);
-    gain.connect(dry);gain.connect(reverb);gain.connect(dlSend);
-    osc.start();
-
-    pluckVoices.push({osc,bp,gain,noiseBuf,busy:false,releaseTime:0});
-  }
+  // ── Pluck engine (kalimba / harp style) ──
+  // Each pluck is created fresh as short-lived oscillators.
+  // This avoids the scheduling conflicts of reusing persistent oscillators.
+  const pluckVoices=[]; // track for cleanup
 
   function firePluck(freq, velocity){
-    // Find free voice
     const now=ctx.currentTime;
-    let v=pluckVoices.find(p=>!p.busy || now>p.releaseTime);
-    if(!v) v=pluckVoices[0]; // steal oldest
+    const vol=velocity*opt.pluckVol*0.30;
+    const dur=1.4+velocity*0.6; // 1.4-2.0s tail
 
-    const vol=velocity*opt.pluckVol*0.35;
+    // ── Fundamental (sine, slight pitch bend down on attack) ──
+    const fund=ctx.createOscillator();fund.type="sine";
+    fund.frequency.setValueAtTime(freq*1.008,now); // start slightly sharp
+    fund.frequency.exponentialRampToValueAtTime(freq,now+0.06); // settle
 
-    v.osc.frequency.setValueAtTime(freq,now);
-    v.bp.frequency.setValueAtTime(freq*1.5,now);
+    // ── Octave harmonic (decays faster for shimmer) ──
+    const oct=ctx.createOscillator();oct.type="sine";
+    oct.frequency.setValueAtTime(freq*2.003,now); // slight detune
+    const octGain=ctx.createGain();
+    octGain.gain.setValueAtTime(vol*0.35,now);
+    octGain.gain.exponentialRampToValueAtTime(0.001,now+dur*0.4);
 
-    // Sharp attack, exponential decay
-    v.gain.gain.cancelScheduledValues(now);
-    v.gain.gain.setValueAtTime(0,now);
-    v.gain.gain.linearRampToValueAtTime(vol,now+0.005);
-    v.gain.gain.exponentialRampToValueAtTime(0.001,now+0.8);
+    // ── Third partial (quiet, adds bell quality) ──
+    const third=ctx.createOscillator();third.type="sine";
+    third.frequency.value=freq*2.998;
+    const thirdGain=ctx.createGain();
+    thirdGain.gain.setValueAtTime(vol*0.12,now);
+    thirdGain.gain.exponentialRampToValueAtTime(0.001,now+dur*0.2);
 
-    // Noise transient
-    const nSrc=ctx.createBufferSource();
-    nSrc.buffer=v.noiseBuf;
-    const nGain=ctx.createGain();nGain.gain.value=vol*0.6;
-    nSrc.connect(nGain);
-    const nFilt=ctx.createBiquadFilter();nFilt.type="highpass";nFilt.frequency.value=freq*0.8;
-    nGain.connect(nFilt);nFilt.connect(dry);nFilt.connect(reverb);
-    nSrc.start(now);
+    // ── Voice gain envelope ──
+    const gain=ctx.createGain();
+    gain.gain.setValueAtTime(0,now);
+    gain.gain.linearRampToValueAtTime(vol,now+0.012); // soft attack ~12ms
+    // Two-stage decay: quick initial drop then long tail
+    gain.gain.setTargetAtTime(vol*0.45,now+0.012,0.12); // drop to 45% over ~120ms
+    gain.gain.setTargetAtTime(0.001,now+0.3,dur*0.28);  // long tail
 
-    v.busy=true;
-    v.releaseTime=now+0.8;
+    // ── Filter: bright attack sweeps down to warm ──
+    const lpf=ctx.createBiquadFilter();lpf.type="lowpass";
+    lpf.Q.value=0.9;
+    lpf.frequency.setValueAtTime(Math.min(freq*8,10000),now);
+    lpf.frequency.exponentialRampToValueAtTime(Math.max(freq*1.5,200),now+dur*0.5);
+
+    // ── Tiny noise layer for pluck texture (much quieter than before) ──
+    const noiseLen=Math.floor(ctx.sampleRate*0.02);
+    const nBuf=ctx.createBuffer(1,noiseLen,ctx.sampleRate);
+    const nd=nBuf.getChannelData(0);
+    for(let j=0;j<noiseLen;j++) nd[j]=(Math.random()*2-1)*Math.pow(1-j/noiseLen,6);
+    const nSrc=ctx.createBufferSource();nSrc.buffer=nBuf;
+    const nGain=ctx.createGain();nGain.gain.value=vol*0.15; // subtle
+    const nFilt=ctx.createBiquadFilter();nFilt.type="bandpass";
+    nFilt.frequency.value=freq*2;nFilt.Q.value=1;
+
+    // ── Routing ──
+    fund.connect(gain);
+    oct.connect(octGain);octGain.connect(gain);
+    third.connect(thirdGain);thirdGain.connect(gain);
+    gain.connect(lpf);
+    nSrc.connect(nGain);nGain.connect(nFilt);nFilt.connect(lpf);
+
+    // Plucks get extra reverb for the wet quality
+    const pluckDry=ctx.createGain();pluckDry.gain.value=0.45;
+    const pluckWet=ctx.createGain();pluckWet.gain.value=0.55;
+    lpf.connect(pluckDry);pluckDry.connect(dry);
+    lpf.connect(pluckWet);pluckWet.connect(reverb);
+    lpf.connect(dlSend);
+
+    // ── Start & auto-cleanup ──
+    fund.start(now);oct.start(now);third.start(now);nSrc.start(now);
+    const stopTime=now+dur+0.5;
+    fund.stop(stopTime);oct.stop(stopTime);third.stop(stopTime);
+
+    const entry={fund,oct,third,stopTime};
+    pluckVoices.push(entry);
+    // Prune finished voices periodically
+    if(pluckVoices.length>20){
+      const cutoff=now-0.5;
+      while(pluckVoices.length>0 && pluckVoices[0].stopTime<cutoff)
+        pluckVoices.shift();
+    }
   }
 
   return{ctx,dry,reverb,revSend,dlSend,dlOut,droneG,droneOscs,droneF,lfo,trem,
@@ -629,9 +660,11 @@ function loop(){
     vc.energy=tg;
 
     // Pluck trigger
-    if(opt.pluck && deltas[i]>0.12){
-      a.firePluck(SCALE[i].freq, Math.min(1,deltas[i]*3));
+    if(opt.pluck && deltas[i]>0.15 && pluckCooldown[i]<=0){
+      a.firePluck(SCALE[i].freq, Math.min(1,deltas[i]*2.5));
+      pluckCooldown[i]=8; // ~8 frames cooldown (~270ms at 30fps)
     }
+    if(pluckCooldown[i]>0) pluckCooldown[i]--;
   });
 
   // Pad
@@ -679,6 +712,7 @@ async function start(){
     if(audio.ctx.state==="suspended") await audio.ctx.resume();
     bgModel=[];smoothHorizon=0.5;smoothEnergies=new Array(SCALE.length).fill(0);
     prevColLum=null;prevColDelta=null;globalEnergy=0;
+    pluckCooldown=new Array(SCALE.length).fill(0);
     zoneHue=new Array(SCALE.length).fill(0);zoneSat=new Array(SCALE.length).fill(0);
     document.body.classList.add("running");
     raf=requestAnimationFrame(loop);
@@ -698,7 +732,7 @@ function stop(){
     audio.lfo.stop();audio.trem.stop();
     audio.voices.forEach(v=>{try{v.car.stop();v.mod.stop();v.shim.stop();v.fifth.stop()}catch(e){}});
     audio.padOscs.forEach(o=>{try{o.stop()}catch(e){}});
-    audio.pluckVoices.forEach(p=>{try{p.osc.stop()}catch(e){}});
+    audio.pluckVoices.forEach(p=>{try{p.fund.stop();p.oct.stop();p.third.stop()}catch(e){}});
     audio.ctx.close();audio=null;
   }
   bgModel=[];prevColLum=null;prevColDelta=null;
