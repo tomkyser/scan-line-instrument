@@ -152,6 +152,14 @@ border-radius:8px;background:rgba(255,0,255,.6);border:2px solid rgba(255,200,25
       </div>
       <div class="setting-row">
         <div>
+          <div class="setting-name">Drone</div>
+          <div class="setting-hint">Continuous bass tone</div>
+        </div>
+        <label class="toggle"><input type="checkbox" id="opt-drone" checked>
+          <div class="track"></div><div class="thumb"></div></label>
+      </div>
+      <div class="setting-row">
+        <div>
           <div class="setting-name">Pluck Transients</div>
           <div class="setting-hint">Sharp edges trigger bell/pluck tones</div>
         </div>
@@ -236,6 +244,7 @@ const SCAN_COLS=5;
 // ── Settings (live-read each frame) ────────────────────────────
 const opt = {
   get indoor()   { return document.getElementById("opt-indoor").checked },
+  get drone()    { return document.getElementById("opt-drone").checked },
   get color()    { return document.getElementById("opt-color").checked },
   get pluck()    { return document.getElementById("opt-pluck").checked },
   get delay()    { return document.getElementById("opt-delay").checked },
@@ -730,6 +739,7 @@ function loop(){
     });
   }
   a.droneF.frequency.setTargetAtTime(420+globalEnergy*600,now,0.2);
+  a.droneG.gain.setTargetAtTime(opt.drone?0.10:0,now,opt.drone?0.3:0.15);
 
   // Delay send toggle
   a.dlOut.gain.setTargetAtTime(opt.delay?0.35:0,now,0.1);
