@@ -826,7 +826,7 @@ function estimateDepth(d,w,h,nZ,scanX){
 }
 
 // ── Glow ───────────────────────────────────────────────────────
-function renderGlow(norm,tE){
+function renderGlow(norm,tE,multiOn){
   const w=glowC.width,h=glowC.height;glCtx.clearRect(0,0,w,h);
   const sx=Math.floor(w*SCAN_X);
   const ga=0.08+tE*0.35,gw=30+tE*80;
@@ -838,21 +838,46 @@ function renderGlow(norm,tE){
   gr.addColorStop(1,"rgba(255,0,255,0)");
   glCtx.fillStyle=gr;glCtx.fillRect(sx-gw,0,gw*2,h);
 
+  // Flanking line glows
+  if(multiOn){
+    const sxL=Math.floor(w*SCAN_L),sxR=Math.floor(w*SCAN_R);
+    const fgw=15+tE*40;
+
+    // Left line glow (blue-tinted)
+    const grL=glCtx.createLinearGradient(sxL-fgw,0,sxL+fgw,0);
+    grL.addColorStop(0,"rgba(100,180,255,0)");
+    grL.addColorStop(0.5,`rgba(100,180,255,${ga*0.5})`);
+    grL.addColorStop(1,"rgba(100,180,255,0)");
+    glCtx.fillStyle=grL;glCtx.fillRect(sxL-fgw,0,fgw*2,h);
+
+    // Right line glow (warm-tinted)
+    const grR=glCtx.createLinearGradient(sxR-fgw,0,sxR+fgw,0);
+    grR.addColorStop(0,"rgba(255,180,100,0)");
+    grR.addColorStop(0.5,`rgba(255,180,100,${ga*0.5})`);
+    grR.addColorStop(1,"rgba(255,180,100,0)");
+    glCtx.fillStyle=grR;glCtx.fillRect(sxR-fgw,0,fgw*2,h);
+  }
+
   for(let i=0;i<SCALE.length;i++){
     const e=norm[i];if(e<0.05) continue;
     const y=(1-(i+0.5)/SCALE.length)*h,r=3+e*14;
-    // Tint by hue if color mode on
     let cr=255,cg=Math.floor(150+e*105),cb=Math.floor(220-e*120);
     if(opt.color && zoneSat[i]>0.15){
       const hu=zoneHue[i];
-      // Warm hues (reds/oranges/yellows 0-60,300-360) tint orange
-      // Cool hues (blues/greens 120-270) tint cyan
       if((hu<80||hu>290)){cr=255;cg=Math.floor(120+e*80);cb=Math.floor(60+e*40);}
       else if(hu>160&&hu<270){cr=Math.floor(80+e*60);cg=Math.floor(180+e*75);cb=255;}
     }
-    glCtx.beginPath();glCtx.arc(sx,y,r,0,Math.PI*2);
+
+    // Draw on appropriate scan line position
+    let dotX=sx;
+    if(multiOn){
+      if(VOICE_L.includes(i)) dotX=Math.floor(w*SCAN_L);
+      else if(VOICE_R.includes(i)) dotX=Math.floor(w*SCAN_R);
+    }
+
+    glCtx.beginPath();glCtx.arc(dotX,y,r,0,Math.PI*2);
     glCtx.fillStyle=`rgba(${cr},${cg},${cb},${e*0.7})`;glCtx.fill();
-    if(e>0.2){glCtx.beginPath();glCtx.arc(sx,y,r*2.5,0,Math.PI*2);
+    if(e>0.2){glCtx.beginPath();glCtx.arc(dotX,y,r*2.5,0,Math.PI*2);
       glCtx.fillStyle=`rgba(${cr},${cg},${cb},${e*0.12})`;glCtx.fill();}
   }
 }
@@ -880,14 +905,62 @@ function loop(){
   // Indoor: smoothEnergyCoM is updated inside sampleScanIndoor
 
   // ── Scan ──
+  const multiOn=opt.multi;
+  const depthOn=opt.depth;
+
+  // Toggle CSS class for secondary scan lines
+  document.body.classList.toggle("multi-line",multiOn);
+
   const{energies:rawE,hues,sats}=indoor
     ? sampleScanIndoor(img,PW,PH,SCALE.length)
     : sampleScan(img,PW,PH,SCALE.length);
+
+  // Flanking columns (only when multi-line)
+  let rawL=null, rawR=null;
+  if(multiOn){
+    const flL=sampleFlankColumn(img,PW,PH,SCALE.length,SCAN_L,prevColLumL);
+    prevColLumL=flL.colLum;
+    const flR=sampleFlankColumn(img,PW,PH,SCALE.length,SCAN_R,prevColLumR);
+    prevColLumR=flR.colLum;
+    rawL=flL.energies;
+    rawR=flR.energies;
+  }
+
+  // Depth estimation
+  let rawSharp=null;
+  if(depthOn){
+    rawSharp=estimateDepth(img,PW,PH,SCALE.length,SCAN_X);
+    // Invert + smooth
+    for(let i=0;i<SCALE.length;i++){
+      const s=rawSharp[SCALE.length-1-i];
+      zoneSharpness[i]=zoneSharpness[i]*0.85+s*0.15;
+    }
+  }
 
   // Invert: top→highest
   const mapped=rawE.map((_,i)=>rawE[SCALE.length-1-i]);
   const mappedH=hues.map((_,i)=>hues[SCALE.length-1-i]);
   const mappedS=sats.map((_,i)=>sats[SCALE.length-1-i]);
+
+  // Multi-line: remap energies per voice group
+  if(multiOn && rawL && rawR){
+    const mL=rawL.map((_,i)=>rawL[SCALE.length-1-i]);
+    const mR=rawR.map((_,i)=>rawR[SCALE.length-1-i]);
+    // Smooth flanking energies
+    for(let i=0;i<SCALE.length;i++){
+      const tL=mL[i]||0, tR=mR[i]||0;
+      multiEnergiesL[i]=tL>multiEnergiesL[i]
+        ?multiEnergiesL[i]*0.55+tL*0.45
+        :multiEnergiesL[i]*0.94+tL*0.06;
+      multiEnergiesR[i]=tR>multiEnergiesR[i]
+        ?multiEnergiesR[i]*0.55+tR*0.45
+        :multiEnergiesR[i]*0.94+tR*0.06;
+    }
+    // Override mapped: low voices use L, mid use center, high use R
+    for(const idx of VOICE_L) mapped[idx]=(mapped[idx]*0.3+multiEnergiesL[idx]*0.7);
+    for(const idx of VOICE_R) mapped[idx]=(mapped[idx]*0.3+multiEnergiesR[idx]*0.7);
+    // VOICE_M stays as center (already in mapped)
+  }
 
   // Smooth hue/sat
   for(let i=0;i<SCALE.length;i++){
@@ -1027,15 +1100,22 @@ function loop(){
       vc.modD.gain.setTargetAtTime(newDepth,now,0.1);
     }
 
-    const tg=e*0.10;
+    // Depth modulation: sharp/close → louder+brighter, blurry/far → quieter+darker+wetter
+    const sharp=depthOn?zoneSharpness[i]:0.7; // default mid when off
+    const depthGainMul=0.5+sharp*0.7; // 0.5-1.2
+    const depthFilterMul=0.6+sharp*0.8; // 0.6-1.4
+
+    const tg=e*0.10*depthGainMul;
     const tc=tg>vc.energy?0.04:0.8;
     vc.gain.gain.setTargetAtTime(tg,now,tc);
-    vc.filt.frequency.setTargetAtTime(Math.min(vc.currentFreq*(2+e*6),8000),now,0.08);
+    const filterF=Math.min(vc.currentFreq*(2+e*6)*depthFilterMul,8000);
+    vc.filt.frequency.setTargetAtTime(filterF,now,0.08);
     vc.energy=tg;
 
-    // Pluck trigger (use current tuned frequency)
+    // Pluck trigger (use current tuned frequency, depth affects velocity)
     if(opt.pluck && deltas[i]>pluckThresh && pluckCooldown[i]<=0){
-      a.firePluck(currentFreqs[i], Math.min(1,deltas[i]*2.5));
+      const pluckVel=Math.min(1,deltas[i]*2.5)*depthGainMul;
+      a.firePluck(currentFreqs[i], pluckVel);
       pluckCooldown[i]=pluckCD;
     }
     if(pluckCooldown[i]>0) pluckCooldown[i]--;
@@ -1062,11 +1142,17 @@ function loop(){
 
   const slG=8+globalEnergy*35,slA=0.3+globalEnergy*0.5;
   sLine.style.boxShadow=`0 0 ${slG}px rgba(255,0,255,${slA}),0 0 ${slG*2.5}px rgba(255,0,255,${slA*0.3})`;
+  if(multiOn){
+    const flG=4+globalEnergy*15,flA=0.15+globalEnergy*0.25;
+    sLineL.style.boxShadow=`0 0 ${flG}px rgba(100,180,255,${flA})`;
+    sLineR.style.boxShadow=`0 0 ${flG}px rgba(255,180,100,${flA})`;
+  }
 
   for(let i=0;i<SCALE.length;i++){
     const e=norm[i],nr=noteRows[i];
+    const sh=depthOn?zoneSharpness[i]:0.7;
     nr.row.style.opacity=e>0.02?0.3+e*0.7:0.12;
-    nr.bar.style.width=Math.max(2,e*50)+"px";
+    nr.bar.style.width=Math.max(2,e*(35+sh*25))+"px"; // sharp=wider
     nr.bar.style.height=Math.max(2,3+e*12)+"px";
 
     let cr=255,cg=Math.floor(120+e*135),cb=Math.floor(220-e*180);
@@ -1077,7 +1163,8 @@ function loop(){
       else{cr=Math.floor(180+e*75);cg=255;cb=Math.floor(100+e*80);}
     }
     nr.bar.style.background=`rgba(${cr},${cg},${cb},${(0.3+e*0.7).toFixed(2)})`;
-    nr.bar.style.boxShadow=e>0.15?`0 0 ${(e*16).toFixed(0)}px rgba(${cr},${cg},${cb},${(e*0.6).toFixed(2)})`:"none";
+    const glowR=e*(12+sh*8); // sharp = more glow
+    nr.bar.style.boxShadow=e>0.15?`0 0 ${glowR.toFixed(0)}px rgba(${cr},${cg},${cb},${(e*0.6).toFixed(2)})`:"none";
     nr.lbl.style.color=`rgba(255,200,255,${(0.2+e*0.8).toFixed(2)})`;
     // Update label if scale shifted
     if(opt.adapt && SCALE[i].freq!==SCALE[i].coolFreq){
@@ -1087,16 +1174,23 @@ function loop(){
     }
   }
 
-  renderGlow(norm,globalEnergy);
+  renderGlow(norm,globalEnergy,multiOn);
 
   // During recording, composite overlays onto camera canvas for capture
   if(recorder && recorder.state==="recording"){
-    // Draw glow
     camCtx.drawImage(glowC,0,0);
-    // Draw scan line
-    const sx=Math.floor(camC.width*SCAN_X);
+    const cw2=camC.width;
+    // Draw scan line(s)
+    const sx=Math.floor(cw2*SCAN_X);
     camCtx.fillStyle=`rgba(255,0,255,${0.5+globalEnergy*0.3})`;
     camCtx.fillRect(sx-1,0,2,camC.height);
+    if(multiOn){
+      const sxL=Math.floor(cw2*SCAN_L),sxR=Math.floor(cw2*SCAN_R);
+      camCtx.fillStyle="rgba(100,180,255,0.3)";
+      camCtx.fillRect(sxL,0,1,camC.height);
+      camCtx.fillStyle="rgba(255,180,100,0.3)";
+      camCtx.fillRect(sxR,0,1,camC.height);
+    }
   }
   raf=requestAnimationFrame(loop);
 }
@@ -1116,6 +1210,10 @@ async function start(){
     pluckCooldown=new Array(SCALE.length).fill(0);
     smoothEnergyCoM=0.5;zoneMeans=new Array(SCALE.length).fill(128);
     sceneWarmth=0.65;currentFreqs=SCALE.map(s=>s.freq);
+    multiEnergiesL=new Array(SCALE.length).fill(0);
+    multiEnergiesR=new Array(SCALE.length).fill(0);
+    prevColLumL=null;prevColLumR=null;
+    zoneSharpness=new Array(SCALE.length).fill(0.5);
     zoneHue=new Array(SCALE.length).fill(0);zoneSat=new Array(SCALE.length).fill(0);
     document.body.classList.add("running");
     raf=requestAnimationFrame(loop);
@@ -1144,6 +1242,7 @@ function stop(){
   bgModel=[];prevColLum=null;prevColDelta=null;
   document.body.classList.remove("running");
   document.body.classList.remove("recording");
+  document.body.classList.remove("multi-line");
   document.getElementById("start-screen").style.display="flex";
 }
 
