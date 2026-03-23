@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -20,189 +21,94 @@
     color: #fff;
   }
   body { position: fixed; inset: 0; }
+  #app { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
 
-  #app {
-    position: fixed;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
+#start-screen {
+display: flex; flex-direction: column; align-items: center; gap: 20px; padding: 32px;
+}
+#start-screen .line {
+width: 2px; height: 100px;
+background: linear-gradient(to bottom, transparent, rgba(255,0,255,0.8), transparent);
+}
+#start-screen h1 { font-size: 22px; font-weight: 300; letter-spacing: 6px; text-transform: uppercase; }
+#start-screen .sub { color: rgba(255,200,255,0.45); font-size: 12px; letter-spacing: 2px; text-transform: uppercase; }
+#start-screen .desc { color: rgba(255,255,255,0.3); font-size: 11px; line-height: 1.8; text-align: center; max-width: 320px; }
 
-  /* ── Start Screen ── */
-  #start-screen {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 20px;
-    padding: 32px;
-  }
-  #start-screen .line {
-    width: 2px;
-    height: 100px;
-    background: linear-gradient(to bottom, transparent, rgba(255,0,255,0.8), transparent);
-  }
-  #start-screen h1 {
-    font-size: 22px;
-    font-weight: 300;
-    letter-spacing: 6px;
-    text-transform: uppercase;
-  }
-  #start-screen .sub {
-    color: rgba(255, 200, 255, 0.45);
-    font-size: 12px;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-  }
-  #start-screen .desc {
-    color: rgba(255,255,255,0.3);
-    font-size: 11px;
-    line-height: 1.8;
-    text-align: center;
-    max-width: 320px;
-  }
-  .btn {
-    background: rgba(255, 0, 255, 0.1);
-    border: 1px solid rgba(255, 0, 255, 0.4);
-    border-radius: 12px;
-    color: #fff;
-    padding: 14px 44px;
-    font-size: 14px;
-    letter-spacing: 3px;
-    text-transform: uppercase;
-    cursor: pointer;
-    font-family: inherit;
-    -webkit-tap-highlight-color: transparent;
-    transition: background 0.15s;
-  }
-  .btn:active { background: rgba(255, 0, 255, 0.25); }
-  .btn-stop {
-    position: absolute;
-    bottom: max(28px, env(safe-area-inset-bottom, 28px));
-    left: 50%;
-    transform: translateX(-50%);
-    padding: 10px 32px;
-    font-size: 13px;
-    border-radius: 8px;
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    z-index: 30;
-  }
+.btn {
+background: rgba(255,0,255,0.1); border: 1px solid rgba(255,0,255,0.4);
+border-radius: 12px; color: #fff; padding: 14px 44px; font-size: 14px;
+letter-spacing: 3px; text-transform: uppercase; cursor: pointer; font-family: inherit;
+-webkit-tap-highlight-color: transparent; transition: background 0.15s;
+}
+.btn:active { background: rgba(255,0,255,0.25); }
+.btn-stop {
+position: absolute; bottom: max(28px, env(safe-area-inset-bottom, 28px));
+left: 50%; transform: translateX(-50%); padding: 10px 32px; font-size: 13px;
+border-radius: 8px; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 30;
+}
 
-  /* ── Camera / Running ── */
-  #camera-canvas {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-  }
-  #process-canvas { display: none; }
-  #video-el {
-    position: absolute;
-    opacity: 0;
-    pointer-events: none;
-    width: 1px;
-    height: 1px;
-  }
+#camera-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+#process-canvas { display: none; }
+#video-el { position: absolute; opacity: 0; pointer-events: none; width: 1px; height: 1px; }
+#glow-canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5; }
 
-  /* ── Overlay elements ── */
-  .overlay { position: absolute; pointer-events: none; }
+.overlay { position: absolute; pointer-events: none; }
 
-  #safe-zone {
-    left: 0; right: 0;
-    background: rgba(255, 0, 255, 0.04);
-    border-top: 1px solid rgba(255, 0, 255, 0.15);
-    border-bottom: 1px solid rgba(255, 0, 255, 0.15);
-  }
-  #horizon-line {
-    left: 0; right: 0;
-    height: 1px;
-    background: rgba(255, 180, 0, 0.5);
-  }
-  #scan-line {
-    top: 0; bottom: 0;
-    width: 2px;
-    background: rgba(255, 0, 255, 0.7);
-    box-shadow: 0 0 12px rgba(255, 0, 255, 0.5), 0 0 30px rgba(255, 0, 255, 0.2);
-    z-index: 10;
-  }
-  #note-indicators {
-    top: 0; bottom: 0;
-    width: 70px;
-    z-index: 10;
-  }
-  .note-row {
-    position: absolute;
-    left: 0;
-    transform: translateY(-50%);
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    opacity: 0.2;
-    transition: opacity 0.12s;
-  }
-  .note-bar {
-    min-width: 2px;
-    min-height: 2px;
-    border-radius: 2px;
-    transition: width 0.08s, height 0.08s, background 0.08s, box-shadow 0.15s;
-  }
-  .note-label {
-    font-size: 9px;
-    letter-spacing: 0.5px;
-    white-space: nowrap;
-    color: rgba(255, 200, 255, 0.3);
-    transition: color 0.12s;
-  }
-  #label-top {
-    top: max(12px, env(safe-area-inset-top, 12px));
-    left: 12px;
-    color: rgba(255, 200, 255, 0.6);
-    font-size: 10px;
-    letter-spacing: 1.5px;
-    text-transform: uppercase;
-    z-index: 10;
-  }
-  #label-safe {
-    right: 12px;
-    color: rgba(255, 180, 0, 0.4);
-    font-size: 9px;
-    letter-spacing: 1px;
-  }
+#safe-zone {
+left: 0; right: 0;
+background: rgba(255,0,255,0.03);
+border-top: 1px solid rgba(255,0,255,0.1);
+border-bottom: 1px solid rgba(255,0,255,0.1);
+}
+#horizon-line { left: 0; right: 0; height: 1px; background: rgba(255,180,0,0.4); }
+#scan-line {
+top: 0; bottom: 0; width: 2px;
+background: rgba(255,0,255,0.6);
+z-index: 10;
+transition: box-shadow 0.1s;
+}
+#note-indicators { top: 0; bottom: 0; width: 80px; z-index: 10; }
 
-  /* Hidden when not running */
-  .running-only { display: none; }
-  body.running .running-only { display: block; }
-  body.running #start-screen { display: none; }
+.note-row {
+position: absolute; left: 0; transform: translateY(-50%);
+display: flex; align-items: center; gap: 5px;
+opacity: 0.15; transition: opacity 0.1s;
+}
+.note-bar {
+min-width: 2px; min-height: 2px; border-radius: 2px;
+transition: width 0.06s, height 0.06s, background 0.06s, box-shadow 0.12s;
+}
+.note-label {
+font-size: 9px; letter-spacing: 0.5px; white-space: nowrap;
+color: rgba(255,200,255,0.25); transition: color 0.1s;
+}
+#label-top {
+top: max(12px, env(safe-area-inset-top, 12px)); left: 12px;
+color: rgba(255,200,255,0.5); font-size: 10px; letter-spacing: 1.5px;
+text-transform: uppercase; z-index: 10;
+}
+#label-safe { right: 12px; color: rgba(255,180,0,0.3); font-size: 9px; letter-spacing: 1px; }
 
-  #error-screen {
-    display: none;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 16px;
-    padding: 32px;
-    text-align: center;
-  }
-  #error-screen .err-msg {
-    color: rgba(255, 100, 100, 0.8);
-    font-size: 13px;
-  }
-  #error-screen .err-hint {
-    color: rgba(255,255,255,0.3);
-    font-size: 11px;
-    max-width: 300px;
-    line-height: 1.7;
-  }
+.running-only { display: none; }
+body.running .running-only { display: block; }
+body.running #start-screen { display: none; }
+
+#error-screen {
+display: none; flex-direction: column; align-items: center; justify-content: center;
+gap: 16px; padding: 32px; text-align: center;
+}
+#error-screen .err-msg { color: rgba(255,100,100,0.8); font-size: 13px; }
+#error-screen .err-hint { color: rgba(255,255,255,0.3); font-size: 11px; max-width: 300px; line-height: 1.7; }
 </style>
+
 </head>
 <body>
 <div id="app">
   <video id="video-el" playsinline muted></video>
   <canvas id="process-canvas"></canvas>
   <canvas id="camera-canvas" class="running-only"></canvas>
+  <canvas id="glow-canvas" class="running-only"></canvas>
 
-  <!-- Overlays -->
   <div id="safe-zone" class="overlay running-only"></div>
   <div id="horizon-line" class="overlay running-only"></div>
   <div id="scan-line" class="overlay running-only"></div>
@@ -215,23 +121,21 @@
     <div class="line"></div>
     <h1>Scan Line</h1>
     <p class="sub">camera → light → sound</p>
-    <p class="desc">
-      Point your rear camera at a scene. Walk or pan slowly.
-      Objects crossing the scan line become music.
-    </p>
+    <p class="desc">Point your rear camera at a scene. Walk or pan slowly. Objects crossing the scan line become music.</p>
     <button class="btn" id="start-btn" style="margin-top:12px">▶&ensp;begin</button>
   </div>
 
   <div id="error-screen">
     <p class="err-msg" id="err-msg"></p>
-    <p class="err-hint">Camera access is required. Make sure you're opening this file directly in Safari — not inside an app's built-in browser.</p>
+    <p class="err-hint">Camera access is required. Open this page directly in Safari.</p>
     <button class="btn" id="back-btn" style="padding:8px 24px;font-size:12px">back</button>
   </div>
 </div>
 
 <script>
-// ── Constants ──────────────────────────────────────────────────
-const SCALE_NOTES = [
+// ── Scale (wider range, Bb major / F mixolydian) ───────────────
+const SCALE = [
+  { note: "F2",  freq: 87.31  },
   { note: "Bb2", freq: 116.54 },
   { note: "C3",  freq: 130.81 },
   { note: "D3",  freq: 146.83 },
@@ -244,82 +148,75 @@ const SCALE_NOTES = [
   { note: "G4",  freq: 392.00 },
   { note: "Bb4", freq: 466.16 },
   { note: "C5",  freq: 523.25 },
+  { note: "D5",  freq: 587.33 },
+  { note: "F5",  freq: 698.46 },
 ];
 
-const DRONE_BASE = 87.31;    // F2
+const DRONE_BASE = 87.31;
 const SCAN_X = 0.62;
-const SAFE_TOP = 0.30;
-const SAFE_BOT = 0.70;
+const SAFE_TOP = 0.28;
+const SAFE_BOT = 0.72;
 const PW = 320, PH = 240;
-const HORIZON_SMOOTH = 0.92;
-const BG_RATE = 0.005;
-const ENERGY_THRESH = 12;
-const NOTE_ATTACK = 0.08;
-const NOTE_RELEASE = 0.6;
-const ENERGY_SMOOTH_UP = 0.75;
-const ENERGY_SMOOTH_DN = 0.92;
+const HORIZON_SMOOTH = 0.91;
+const BG_RATE = 0.008;
+const ENERGY_THRESH = 4;
+const NOTE_ATTACK = 0.04;
+const NOTE_RELEASE = 0.8;
+const E_UP = 0.55;
+const E_DN = 0.94;
+const SCAN_COLS = 5;
 
-// ── State ──────────────────────────────────────────────────────
-let audio = null;
-let stream = null;
-let raf = null;
-let bgModel = [];
-let smoothHorizon = 0.5;
-let smoothEnergies = new Array(SCALE_NOTES.length).fill(0);
+let audio = null, stream = null, raf = null;
+let bgModel = [], smoothHorizon = 0.5;
+let smoothEnergies = new Array(SCALE.length).fill(0);
+let globalEnergy = 0, prevColLum = null;
 
-// ── DOM refs ───────────────────────────────────────────────────
-const videoEl = document.getElementById("video-el");
-const procCanvas = document.getElementById("process-canvas");
-const camCanvas = document.getElementById("camera-canvas");
+const videoEl  = document.getElementById("video-el");
+const procC    = document.getElementById("process-canvas");
+const camC     = document.getElementById("camera-canvas");
+const glowC    = document.getElementById("glow-canvas");
 const safezone = document.getElementById("safe-zone");
-const horizonLine = document.getElementById("horizon-line");
-const scanLine = document.getElementById("scan-line");
-const noteContainer = document.getElementById("note-indicators");
-const labelSafe = document.getElementById("label-safe");
+const hLine    = document.getElementById("horizon-line");
+const sLine    = document.getElementById("scan-line");
+const noteCont = document.getElementById("note-indicators");
+const labelS   = document.getElementById("label-safe");
 
-procCanvas.width = PW;
-procCanvas.height = PH;
-const pCtx = procCanvas.getContext("2d", { willReadFrequently: true });
-const camCtx = camCanvas.getContext("2d");
+procC.width = PW; procC.height = PH;
+const pCtx  = procC.getContext("2d", { willReadFrequently: true });
+const camCtx = camC.getContext("2d");
+const glCtx  = glowC.getContext("2d");
 
-// ── Position overlays ──────────────────────────────────────────
-function layoutOverlays() {
-  safezone.style.top = (SAFE_TOP * 100) + "%";
-  safezone.style.height = ((SAFE_BOT - SAFE_TOP) * 100) + "%";
-  scanLine.style.left = (SCAN_X * 100) + "%";
-  noteContainer.style.left = "calc(" + (SCAN_X * 100) + "% + 8px)";
-  labelSafe.style.top = "calc(" + (SAFE_TOP * 100) + "% - 16px)";
-}
-layoutOverlays();
+safezone.style.top = (SAFE_TOP*100)+"%";
+safezone.style.height = ((SAFE_BOT-SAFE_TOP)*100)+"%";
+sLine.style.left = (SCAN_X*100)+"%";
+noteCont.style.left = "calc("+(SCAN_X*100)+"% + 10px)";
+labelS.style.top = "calc("+(SAFE_TOP*100)+"% - 16px)";
 
-// Build note indicator DOM
-const noteRows = SCALE_NOTES.map((n, i) => {
+const noteRows = SCALE.map((n,i) => {
   const row = document.createElement("div");
   row.className = "note-row";
-  const y = (1 - (i + 0.5) / SCALE_NOTES.length) * 100;
-  row.style.top = y + "%";
-
+  row.style.top = (1-(i+0.5)/SCALE.length)*100+"%";
   const bar = document.createElement("div");
   bar.className = "note-bar";
-  row.appendChild(bar);
-
-  const label = document.createElement("span");
-  label.className = "note-label";
-  label.textContent = n.note;
-  row.appendChild(label);
-
-  noteContainer.appendChild(row);
-  return { row, bar, label };
+  const lbl = document.createElement("span");
+  lbl.className = "note-label";
+  lbl.textContent = n.note;
+  row.appendChild(bar); row.appendChild(lbl);
+  noteCont.appendChild(row);
+  return { row, bar, lbl };
 });
 
-// ── Audio Builder ──────────────────────────────────────────────
-function makeReverb(ctx, dur, decay) {
+// ── Audio ──────────────────────────────────────────────────────
+function makeIR(ctx, dur, decay, bright) {
   const len = ctx.sampleRate * dur;
   const buf = ctx.createBuffer(2, len, ctx.sampleRate);
   for (let ch = 0; ch < 2; ch++) {
     const d = buf.getChannelData(ch);
-    for (let i = 0; i < len; i++)
-      d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, decay);
+    for (let i = 0; i < len; i++) {
+      const n = Math.random()*2-1;
+      const env = Math.pow(1-i/len, decay);
+      d[i] = (n*env + (i>0 ? d[i-1]*bright : 0)) / (1+bright);
+    }
   }
   return buf;
 }
@@ -328,286 +225,298 @@ function buildAudio() {
   const ctx = new (window.AudioContext || window.webkitAudioContext)();
 
   const comp = ctx.createDynamicsCompressor();
-  comp.threshold.value = -18;
-  comp.knee.value = 12;
-  comp.ratio.value = 6;
-  comp.attack.value = 0.003;
-  comp.release.value = 0.15;
+  comp.threshold.value=-20; comp.knee.value=10; comp.ratio.value=5;
+  comp.attack.value=0.003; comp.release.value=0.12;
   comp.connect(ctx.destination);
 
   const master = ctx.createGain();
-  master.gain.value = 0.75;
+  master.gain.value = 0.8;
   master.connect(comp);
 
-  const convolver = ctx.createConvolver();
-  convolver.buffer = makeReverb(ctx, 2.8, 2.2);
-  const reverbSend = ctx.createGain();
-  reverbSend.gain.value = 0.35;
-  convolver.connect(reverbSend);
-  reverbSend.connect(master);
+  // Reverb
+  const reverb = ctx.createConvolver();
+  reverb.buffer = makeIR(ctx, 3.5, 1.8, 0.6);
+  const revSend = ctx.createGain();
+  revSend.gain.value = 0.40;
+  reverb.connect(revSend); revSend.connect(master);
+
+  // Ping-pong delay
+  const dlL = ctx.createDelay(2); dlL.delayTime.value = 0.375;
+  const dlR = ctx.createDelay(2); dlR.delayTime.value = 0.5;
+  const dlFb = ctx.createGain(); dlFb.gain.value = 0.30;
+  const dlSend = ctx.createGain(); dlSend.gain.value = 0.20;
+  const dlOut = ctx.createGain(); dlOut.gain.value = 0.35;
+  const dlFilt = ctx.createBiquadFilter();
+  dlFilt.type = "lowpass"; dlFilt.frequency.value = 2200;
+  dlSend.connect(dlL); dlL.connect(dlFilt); dlFilt.connect(dlR);
+  dlR.connect(dlFb); dlFb.connect(dlL);
+  dlL.connect(dlOut); dlR.connect(dlOut);
+  dlOut.connect(master); dlOut.connect(reverb);
 
   const dry = ctx.createGain();
-  dry.gain.value = 0.65;
+  dry.gain.value = 0.60;
   dry.connect(master);
 
-  // Drone
-  const droneGain = ctx.createGain();
-  droneGain.gain.value = 0.0;
-  const droneFilter = ctx.createBiquadFilter();
-  droneFilter.type = "lowpass";
-  droneFilter.frequency.value = 500;
-  droneFilter.Q.value = 0.8;
+  // Drone (3 detuned triangles + sub sine)
+  const droneG = ctx.createGain(); droneG.gain.value = 0;
+  const droneF = ctx.createBiquadFilter();
+  droneF.type = "lowpass"; droneF.frequency.value = 420; droneF.Q.value = 1.2;
 
-  const drones = [0, 3, -3].map(det => {
+  const droneOscs = [
+    { type:"triangle", det:0 },
+    { type:"triangle", det:4 },
+    { type:"triangle", det:-4 },
+    { type:"sine", det:0, sub:true },
+  ].map(({type,det,sub}) => {
     const o = ctx.createOscillator();
-    o.type = "triangle";
-    o.frequency.value = DRONE_BASE;
+    o.type = type;
+    o.frequency.value = DRONE_BASE * (sub ? 0.5 : 1);
     o.detune.value = det;
-    o.connect(droneGain);
-    o.start();
+    const g = ctx.createGain(); g.gain.value = sub ? 0.5 : 1;
+    o.connect(g); g.connect(droneG); o.start();
     return o;
   });
 
   const lfo = ctx.createOscillator();
-  lfo.type = "sine";
-  lfo.frequency.value = 0.12;
-  const lfoDepth = ctx.createGain();
-  lfoDepth.gain.value = 180;
-  lfo.connect(lfoDepth);
-  lfoDepth.connect(droneFilter.frequency);
-  lfo.start();
+  lfo.type="sine"; lfo.frequency.value=0.08;
+  const lfoD = ctx.createGain(); lfoD.gain.value=160;
+  lfo.connect(lfoD); lfoD.connect(droneF.frequency); lfo.start();
 
-  droneGain.connect(droneFilter);
-  droneFilter.connect(dry);
-  droneFilter.connect(convolver);
-  droneGain.gain.setTargetAtTime(0.14, ctx.currentTime + 0.1, 0.8);
+  const trem = ctx.createOscillator();
+  trem.type="sine"; trem.frequency.value=0.25;
+  const tremD = ctx.createGain(); tremD.gain.value=0.015;
+  trem.connect(tremD); tremD.connect(droneG.gain); trem.start();
 
-  // Voices
-  const voices = SCALE_NOTES.map(({ freq }) => {
-    const osc = ctx.createOscillator();
-    osc.type = "triangle";
-    osc.frequency.value = freq;
+  droneG.connect(droneF);
+  droneF.connect(dry); droneF.connect(reverb);
+  droneG.gain.setTargetAtTime(0.16, ctx.currentTime+0.1, 1.0);
 
-    const shimmer = ctx.createOscillator();
-    shimmer.type = "sine";
-    shimmer.frequency.value = freq * 2;
-    const shimVol = ctx.createGain();
-    shimVol.gain.value = 0.12;
-    shimmer.connect(shimVol);
+  // Voices — FM synthesis
+  const voices = SCALE.map(({freq}) => {
+    const car = ctx.createOscillator(); car.type="sine"; car.frequency.value=freq;
+    const mod = ctx.createOscillator(); mod.type="sine";
+    const ratio = freq<200?1:freq<400?2:3;
+    mod.frequency.value = freq * ratio;
+    const modD = ctx.createGain();
+    modD.gain.value = freq<200 ? freq*0.3 : freq*0.5;
+    mod.connect(modD); modD.connect(car.frequency);
 
-    const gain = ctx.createGain();
-    gain.gain.value = 0;
+    const shim = ctx.createOscillator(); shim.type="sine"; shim.frequency.value=freq*2.01;
+    const shimG = ctx.createGain(); shimG.gain.value=0.08; shim.connect(shimG);
 
-    const filter = ctx.createBiquadFilter();
-    filter.type = "lowpass";
-    filter.frequency.value = Math.min(freq * 5, 5000);
-    filter.Q.value = 0.5;
+    const fifth = ctx.createOscillator(); fifth.type="sine"; fifth.frequency.value=freq*1.498;
+    const fifthG = ctx.createGain(); fifthG.gain.value=0.04; fifth.connect(fifthG);
 
-    osc.connect(gain);
-    shimVol.connect(gain);
-    gain.connect(filter);
-    filter.connect(dry);
-    filter.connect(convolver);
-    osc.start();
-    shimmer.start();
+    const gain = ctx.createGain(); gain.gain.value=0;
+    const filt = ctx.createBiquadFilter();
+    filt.type="lowpass"; filt.frequency.value=freq*2; filt.Q.value=0.7;
 
-    return { osc, shimmer, gain, filter, energy: 0 };
+    car.connect(gain); shimG.connect(gain); fifthG.connect(gain);
+    gain.connect(filt);
+    filt.connect(dry); filt.connect(reverb); filt.connect(dlSend);
+
+    car.start(); mod.start(); shim.start(); fifth.start();
+    return { car, mod, modD, shim, fifth, gain, filt, energy:0, freq };
   });
 
-  return { ctx, drones, droneGain, droneFilter, lfo, voices, dry, convolver };
+  // Pad
+  const padG = ctx.createGain(); padG.gain.value=0;
+  const padF = ctx.createBiquadFilter();
+  padF.type="lowpass"; padF.frequency.value=800; padF.Q.value=0.3;
+  [1,1.5,2,3].forEach(r => {
+    const o = ctx.createOscillator(); o.type="sine";
+    o.frequency.value=DRONE_BASE*r; o.connect(padG); o.start();
+  });
+  padG.connect(padF); padF.connect(dry); padF.connect(reverb);
+
+  return { ctx, dry, reverb, dlSend, droneG, droneOscs, droneF, lfo, trem, voices, padG, padF };
 }
 
 // ── Vision ─────────────────────────────────────────────────────
-function lum(r, g, b) { return 0.299 * r + 0.587 * g + 0.114 * b; }
+function lum(r,g,b) { return 0.299*r+0.587*g+0.114*b; }
 
-function detectHorizon(data, w, h) {
-  const d = data.data;
-  const top = Math.floor(h * SAFE_TOP);
-  const bot = Math.floor(h * SAFE_BOT);
-  const step = Math.max(1, Math.floor(w / 40));
-  const rowLum = [];
-
-  for (let y = top; y < bot; y++) {
-    let s = 0, c = 0;
-    for (let x = 0; x < w; x += step) {
-      const i = (y * w + x) * 4;
-      s += lum(d[i], d[i+1], d[i+2]);
-      c++;
-    }
-    rowLum.push(s / c);
-  }
-
-  let maxG = 0, hRow = Math.floor((top + bot) / 2);
-  for (let i = 1; i < rowLum.length; i++) {
-    const g = Math.abs(rowLum[i] - rowLum[i-1]);
-    if (g > maxG) { maxG = g; hRow = top + i; }
-  }
-  return hRow / h;
+function detectHorizon(d, w, h) {
+  const p = d.data, top = Math.floor(h*SAFE_TOP), bot = Math.floor(h*SAFE_BOT);
+  const step = Math.max(1,Math.floor(w/40));
+  const rL = [];
+  for (let y=top;y<bot;y++){let s=0,c=0;for(let x=0;x<w;x+=step){const i=(y*w+x)*4;s+=lum(p[i],p[i+1],p[i+2]);c++;}rL.push(s/c);}
+  let mG=0, hR=Math.floor((top+bot)/2);
+  for(let i=1;i<rL.length;i++){const g=Math.abs(rL[i]-rL[i-1]);if(g>mG){mG=g;hR=top+i;}}
+  return hR/h;
 }
 
-function sampleColumn(data, w, h, xRat, nZones) {
-  const d = data.data;
-  const x = Math.floor(w * xRat);
-  const zH = h / nZones;
-  const energies = [];
-
-  for (let z = 0; z < nZones; z++) {
-    const yS = Math.floor(z * zH);
-    const yE = Math.floor((z + 1) * zH);
-    let s = 0, sq = 0, c = 0;
-
-    for (let y = yS; y < yE && y < h; y++) {
-      const i = (y * w + x) * 4;
-      const l = lum(d[i], d[i+1], d[i+2]);
-      s += l; sq += l * l; c++;
+function sampleScan(d, w, h, nZ) {
+  const p = d.data, cx = Math.floor(w*SCAN_X), half = Math.floor(SCAN_COLS/2);
+  const zH = h/nZ, energies = [], colL = [];
+  for (let z=0;z<nZ;z++){
+    const yS=Math.floor(z*zH), yE=Math.floor((z+1)*zH);
+    let ls=0,lsq=0,cs=0,cnt=0;
+    for(let y=yS;y<yE&&y<h;y++){
+      for(let dx=-half;dx<=half;dx++){
+        const x=Math.min(Math.max(cx+dx,0),w-1), i=(y*w+x)*4;
+        const l=lum(p[i],p[i+1],p[i+2]);
+        ls+=l;lsq+=l*l;cnt++;
+        if(dx===0) cs+=l;
+      }
     }
-
-    const mean = s / c;
-    const std = Math.sqrt(Math.max(0, sq / c - mean * mean));
-    const bgDiff = Math.abs(mean - (bgModel[z] ?? mean));
-    bgModel[z] = bgModel[z] == null ? mean : bgModel[z] * (1 - BG_RATE) + mean * BG_RATE;
-
-    energies.push(Math.max(0, std * 0.6 + bgDiff * 0.8 - ENERGY_THRESH));
+    const mean=ls/cnt, std=Math.sqrt(Math.max(0,lsq/cnt-mean*mean));
+    const bgD=Math.abs(mean-(bgModel[z]??mean));
+    const zL=cs/((yE-yS)||1); colL.push(zL);
+    const tD=prevColLum?Math.abs(zL-prevColLum[z]):0;
+    bgModel[z]=bgModel[z]==null?mean:bgModel[z]*(1-BG_RATE)+mean*BG_RATE;
+    energies.push(Math.max(0, std*0.4+bgD*0.6+tD*1.2 - ENERGY_THRESH));
   }
+  prevColLum=colL;
   return energies;
 }
 
-// ── Frame Loop ─────────────────────────────────────────────────
+// ── Glow ───────────────────────────────────────────────────────
+function renderGlow(norm, tE) {
+  const w=glowC.width, h=glowC.height;
+  glCtx.clearRect(0,0,w,h);
+  const sx = Math.floor(w*SCAN_X);
+  const ga = 0.08+tE*0.35, gw = 30+tE*80;
+  const gr = glCtx.createLinearGradient(sx-gw,0,sx+gw,0);
+  gr.addColorStop(0,"rgba(255,0,255,0)");
+  gr.addColorStop(0.4,`rgba(255,50,255,${ga*0.3})`);
+  gr.addColorStop(0.5,`rgba(255,100,255,${ga})`);
+  gr.addColorStop(0.6,`rgba(255,50,255,${ga*0.3})`);
+  gr.addColorStop(1,"rgba(255,0,255,0)");
+  glCtx.fillStyle=gr;
+  glCtx.fillRect(sx-gw,0,gw*2,h);
+
+  for(let i=0;i<SCALE.length;i++){
+    const e=norm[i]; if(e<0.05) continue;
+    const y=(1-(i+0.5)/SCALE.length)*h;
+    const r=3+e*14;
+    glCtx.beginPath(); glCtx.arc(sx,y,r,0,Math.PI*2);
+    glCtx.fillStyle=`rgba(255,${Math.floor(150+e*105)},${Math.floor(220-e*120)},${e*0.7})`;
+    glCtx.fill();
+    if(e>0.2){
+      glCtx.beginPath(); glCtx.arc(sx,y,r*2.5,0,Math.PI*2);
+      glCtx.fillStyle=`rgba(255,100,255,${e*0.12})`;
+      glCtx.fill();
+    }
+  }
+}
+
+// ── Loop ───────────────────────────────────────────────────────
 function loop() {
-  if (!audio) return;
-  const video = videoEl;
+  if(!audio) return;
+  const v=videoEl;
+  pCtx.drawImage(v,0,0,PW,PH);
+  const img=pCtx.getImageData(0,0,PW,PH);
 
-  // Draw to processing canvas
-  pCtx.drawImage(video, 0, 0, PW, PH);
-  const imgData = pCtx.getImageData(0, 0, PW, PH);
-
-  // Draw to visible canvas (cover-fit)
-  const cw = camCanvas.width, ch = camCanvas.height;
-  const vw = video.videoWidth, vh = video.videoHeight;
-  if (vw && vh) {
-    const scale = Math.max(cw / vw, ch / vh);
-    const sw = cw / scale, sh = ch / scale;
-    const sx = (vw - sw) / 2, sy = (vh - sh) / 2;
-    camCtx.drawImage(video, sx, sy, sw, sh, 0, 0, cw, ch);
+  const cw=camC.width,ch=camC.height,vw=v.videoWidth,vh=v.videoHeight;
+  if(vw&&vh){
+    const sc=Math.max(cw/vw,ch/vh),sw=cw/sc,sh=ch/sc,sx2=(vw-sw)/2,sy2=(vh-sh)/2;
+    camCtx.drawImage(v,sx2,sy2,sw,sh,0,0,cw,ch);
   }
 
-  // Horizon
-  const rawH = detectHorizon(imgData, PW, PH);
-  smoothHorizon = smoothHorizon * HORIZON_SMOOTH + rawH * (1 - HORIZON_SMOOTH);
+  const rawH=detectHorizon(img,PW,PH);
+  smoothHorizon=smoothHorizon*HORIZON_SMOOTH+rawH*(1-HORIZON_SMOOTH);
 
-  // Scan column
-  const rawE = sampleColumn(imgData, PW, PH, SCAN_X, SCALE_NOTES.length);
-  // Invert: top of image → highest note
-  const mapped = rawE.map((_, i) => rawE[SCALE_NOTES.length - 1 - i]);
-
-  // Smooth
-  smoothEnergies = smoothEnergies.map((prev, i) => {
-    const t = mapped[i] || 0;
-    return t > prev
-      ? prev * ENERGY_SMOOTH_UP + t * (1 - ENERGY_SMOOTH_UP)
-      : prev * ENERGY_SMOOTH_DN + t * (1 - ENERGY_SMOOTH_DN);
+  const rawE=sampleScan(img,PW,PH,SCALE.length);
+  const mapped=rawE.map((_,i)=>rawE[SCALE.length-1-i]);
+  smoothEnergies=smoothEnergies.map((prev,i)=>{
+    const t=mapped[i]||0;
+    return t>prev?prev*E_UP+t*(1-E_UP):prev*E_DN+t*(1-E_DN);
   });
 
-  // Normalize
-  const maxE = Math.max(...smoothEnergies, 1);
-  const norm = smoothEnergies.map(e => Math.min(1, e / Math.max(maxE * 0.6, 30)));
+  const maxE=Math.max(...smoothEnergies,1);
+  const norm=smoothEnergies.map(e=>Math.min(1,e/Math.max(maxE*0.5,18)));
+  const tE=Math.min(1,norm.reduce((a,b)=>a+b,0)/(SCALE.length*0.4));
+  globalEnergy=globalEnergy*0.85+tE*0.15;
 
-  // Audio update
-  const now = audio.ctx.currentTime;
-  const hOffset = (smoothHorizon - 0.5) * 0.15;
-  const dPitch = DRONE_BASE * (1 - hOffset);
-  audio.drones.forEach(o => o.frequency.setTargetAtTime(dPitch + o.detune.value * 0.5, now, 0.3));
+  const a=audio, now=a.ctx.currentTime;
 
-  audio.voices.forEach((v, i) => {
-    const tg = norm[i] * 0.22;
-    const tc = tg > v.energy ? NOTE_ATTACK : NOTE_RELEASE;
-    v.gain.gain.setTargetAtTime(tg, now, tc);
-    v.energy = tg;
+  // Drone
+  const hOff=(smoothHorizon-0.5)*0.15;
+  const dp=DRONE_BASE*(1-hOff);
+  a.droneOscs.forEach(o=>{
+    const b=o.frequency.value<60?dp*0.5:dp;
+    o.frequency.setTargetAtTime(b,now,0.3);
+  });
+  a.droneF.frequency.setTargetAtTime(420+globalEnergy*600,now,0.2);
+
+  // Voices
+  a.voices.forEach((v2,i)=>{
+    const e=norm[i], tg=e*0.18;
+    const tc=tg>v2.energy?NOTE_ATTACK:NOTE_RELEASE;
+    v2.gain.gain.setTargetAtTime(tg,now,tc);
+    const bd=v2.freq<200?v2.freq*0.3:v2.freq*0.5;
+    v2.modD.gain.setTargetAtTime(bd*(0.3+e*2),now,0.1);
+    v2.filt.frequency.setTargetAtTime(Math.min(v2.freq*(2+e*6),8000),now,0.08);
+    v2.energy=tg;
   });
 
-  // Visual update
-  horizonLine.style.top = (smoothHorizon * 100) + "%";
+  // Pad
+  a.padG.gain.setTargetAtTime(globalEnergy*0.06,now,0.5);
+  a.padF.frequency.setTargetAtTime(600+globalEnergy*1800,now,0.3);
 
-  for (let i = 0; i < SCALE_NOTES.length; i++) {
-    const e = norm[i];
-    const nr = noteRows[i];
-    nr.row.style.opacity = e > 0.02 ? 1 : 0.2;
-    nr.bar.style.width = Math.max(2, e * 44) + "px";
-    nr.bar.style.height = Math.max(2, 4 + e * 10) + "px";
-    const r = 255, g = Math.floor(100 + e * 155), b = Math.floor(200 - e * 200);
-    const a = (0.3 + e * 0.7).toFixed(2);
-    nr.bar.style.background = `rgba(${r},${g},${b},${a})`;
-    nr.bar.style.boxShadow = e > 0.3
-      ? `0 0 ${(e * 12).toFixed(0)}px rgba(255,100,255,${(e * 0.5).toFixed(2)})`
-      : "none";
-    nr.label.style.color = `rgba(255,200,255,${(0.3 + e * 0.7).toFixed(2)})`;
+  // Visuals
+  hLine.style.top=(smoothHorizon*100)+"%";
+  const slG=8+globalEnergy*35, slA=0.3+globalEnergy*0.5;
+  sLine.style.boxShadow=`0 0 ${slG}px rgba(255,0,255,${slA}), 0 0 ${slG*2.5}px rgba(255,0,255,${slA*0.3})`;
+
+  for(let i=0;i<SCALE.length;i++){
+    const e=norm[i],nr=noteRows[i];
+    nr.row.style.opacity=e>0.02?0.3+e*0.7:0.12;
+    nr.bar.style.width=Math.max(2,e*50)+"px";
+    nr.bar.style.height=Math.max(2,3+e*12)+"px";
+    nr.bar.style.background=`rgba(255,${Math.floor(120+e*135)},${Math.floor(220-e*180)},${(0.3+e*0.7).toFixed(2)})`;
+    nr.bar.style.boxShadow=e>0.15?`0 0 ${(e*16).toFixed(0)}px rgba(255,100,255,${(e*0.6).toFixed(2)})`:"none";
+    nr.lbl.style.color=`rgba(255,200,255,${(0.2+e*0.8).toFixed(2)})`;
   }
 
-  raf = requestAnimationFrame(loop);
+  renderGlow(norm,globalEnergy);
+  raf=requestAnimationFrame(loop);
 }
 
 // ── Start / Stop ───────────────────────────────────────────────
 async function start() {
   try {
     stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
-      audio: false,
+      video:{facingMode:"environment",width:{ideal:1280},height:{ideal:720}},audio:false
     });
-
-    videoEl.srcObject = stream;
-    await videoEl.play();
-
-    // Size visible canvas
-    function resizeCam() {
-      camCanvas.width = window.innerWidth;
-      camCanvas.height = window.innerHeight;
-    }
-    resizeCam();
-    window.addEventListener("resize", resizeCam);
-
-    audio = buildAudio();
-    if (audio.ctx.state === "suspended") await audio.ctx.resume();
-
-    bgModel = [];
-    smoothHorizon = 0.5;
-    smoothEnergies = new Array(SCALE_NOTES.length).fill(0);
-
+    videoEl.srcObject=stream; await videoEl.play();
+    function resize(){camC.width=glowC.width=window.innerWidth;camC.height=glowC.height=window.innerHeight;}
+    resize(); window.addEventListener("resize",resize);
+    audio=buildAudio();
+    if(audio.ctx.state==="suspended") await audio.ctx.resume();
+    bgModel=[];smoothHorizon=0.5;smoothEnergies=new Array(SCALE.length).fill(0);prevColLum=null;globalEnergy=0;
     document.body.classList.add("running");
-    raf = requestAnimationFrame(loop);
-
-  } catch (err) {
+    raf=requestAnimationFrame(loop);
+  } catch(err){
     console.error(err);
-    document.getElementById("err-msg").textContent = err.message || "Camera access denied";
-    document.getElementById("start-screen").style.display = "none";
-    document.getElementById("error-screen").style.display = "flex";
+    document.getElementById("err-msg").textContent=err.message||"Camera access denied";
+    document.getElementById("start-screen").style.display="none";
+    document.getElementById("error-screen").style.display="flex";
   }
 }
 
 function stop() {
-  if (raf) cancelAnimationFrame(raf);
-  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
-  if (audio) {
-    audio.drones.forEach(o => { try { o.stop(); } catch(e){} });
-    audio.lfo.stop();
-    audio.voices.forEach(v => { try { v.osc.stop(); v.shimmer.stop(); } catch(e){} });
-    audio.ctx.close();
-    audio = null;
+  if(raf) cancelAnimationFrame(raf);
+  if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}
+  if(audio){
+    audio.droneOscs.forEach(o=>{try{o.stop();}catch(e){}});
+    audio.lfo.stop();audio.trem.stop();
+    audio.voices.forEach(v=>{try{v.car.stop();v.mod.stop();v.shim.stop();v.fifth.stop();}catch(e){}});
+    audio.ctx.close();audio=null;
   }
-  bgModel = [];
+  bgModel=[];prevColLum=null;
   document.body.classList.remove("running");
-  document.getElementById("start-screen").style.display = "flex";
+  document.getElementById("start-screen").style.display="flex";
 }
 
-// ── Events ─────────────────────────────────────────────────────
-document.getElementById("start-btn").addEventListener("click", start);
-document.getElementById("stop-btn").addEventListener("click", stop);
-document.getElementById("back-btn").addEventListener("click", () => {
-  document.getElementById("error-screen").style.display = "none";
-  document.getElementById("start-screen").style.display = "flex";
+document.getElementById("start-btn").addEventListener("click",start);
+document.getElementById("stop-btn").addEventListener("click",stop);
+document.getElementById("back-btn").addEventListener("click",()=>{
+  document.getElementById("error-screen").style.display="none";
+  document.getElementById("start-screen").style.display="flex";
 });
-
-// Prevent iOS rubber-banding
-document.addEventListener("touchmove", e => e.preventDefault(), { passive: false });
+document.addEventListener("touchmove",e=>e.preventDefault(),{passive:false});
 </script>
+
 </body>
 </html>
