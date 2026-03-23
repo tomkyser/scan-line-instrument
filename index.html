@@ -8,97 +8,107 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Scan Line Instrument</title>
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  html, body {
-    width: 100%; height: 100%;
-    overflow: hidden;
-    background: #060608;
-    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', 'Menlo', monospace;
-    touch-action: none;
-    user-select: none;
-    -webkit-user-select: none;
-    -webkit-touch-callout: none;
-    color: #fff;
-  }
-  body { position: fixed; inset: 0; }
-  #app { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:100%;height:100%;overflow:hidden;background:#060608;
+    font-family:'SF Mono','Fira Code','Cascadia Code','Menlo',monospace;
+    touch-action:none;user-select:none;-webkit-user-select:none;
+    -webkit-touch-callout:none;color:#fff}
+  body{position:fixed;inset:0}
+  #app{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
 
-#start-screen {
-display: flex; flex-direction: column; align-items: center; gap: 20px; padding: 32px;
-}
-#start-screen .line {
-width: 2px; height: 100px;
-background: linear-gradient(to bottom, transparent, rgba(255,0,255,0.8), transparent);
-}
-#start-screen h1 { font-size: 22px; font-weight: 300; letter-spacing: 6px; text-transform: uppercase; }
-#start-screen .sub { color: rgba(255,200,255,0.45); font-size: 12px; letter-spacing: 2px; text-transform: uppercase; }
-#start-screen .desc { color: rgba(255,255,255,0.3); font-size: 11px; line-height: 1.8; text-align: center; max-width: 320px; }
+/* Start */
+#start-screen{display:flex;flex-direction:column;align-items:center;gap:20px;padding:32px}
+#start-screen .line{width:2px;height:100px;background:linear-gradient(to bottom,transparent,rgba(255,0,255,0.8),transparent)}
+#start-screen h1{font-size:22px;font-weight:300;letter-spacing:6px;text-transform:uppercase}
+#start-screen .sub{color:rgba(255,200,255,0.45);font-size:12px;letter-spacing:2px;text-transform:uppercase}
+#start-screen .desc{color:rgba(255,255,255,0.3);font-size:11px;line-height:1.8;text-align:center;max-width:320px}
 
-.btn {
-background: rgba(255,0,255,0.1); border: 1px solid rgba(255,0,255,0.4);
-border-radius: 12px; color: #fff; padding: 14px 44px; font-size: 14px;
-letter-spacing: 3px; text-transform: uppercase; cursor: pointer; font-family: inherit;
--webkit-tap-highlight-color: transparent; transition: background 0.15s;
-}
-.btn:active { background: rgba(255,0,255,0.25); }
-.btn-stop {
-position: absolute; bottom: max(28px, env(safe-area-inset-bottom, 28px));
-left: 50%; transform: translateX(-50%); padding: 10px 32px; font-size: 13px;
-border-radius: 8px; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 30;
-}
+.btn{background:rgba(255,0,255,0.1);border:1px solid rgba(255,0,255,0.4);
+border-radius:12px;color:#fff;padding:14px 44px;font-size:14px;
+letter-spacing:3px;text-transform:uppercase;cursor:pointer;font-family:inherit;
+-webkit-tap-highlight-color:transparent;transition:background .15s}
+.btn:active{background:rgba(255,0,255,0.25)}
+.btn-stop{position:absolute;bottom:max(28px,env(safe-area-inset-bottom,28px));
+left:50%;transform:translateX(-50%);padding:10px 32px;font-size:13px;
+border-radius:8px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:30}
 
-#camera-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
-#process-canvas { display: none; }
-#video-el { position: absolute; opacity: 0; pointer-events: none; width: 1px; height: 1px; }
-#glow-canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5; }
+#camera-canvas{position:absolute;inset:0;width:100%;height:100%}
+#process-canvas{display:none}
+#video-el{position:absolute;opacity:0;pointer-events:none;width:1px;height:1px}
+#glow-canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:5}
 
-.overlay { position: absolute; pointer-events: none; }
+.overlay{position:absolute;pointer-events:none}
+#safe-zone{left:0;right:0;background:rgba(255,0,255,0.03);
+border-top:1px solid rgba(255,0,255,0.1);border-bottom:1px solid rgba(255,0,255,0.1)}
+#horizon-line{left:0;right:0;height:1px;background:rgba(255,180,0,0.4)}
+#scan-line{top:0;bottom:0;width:2px;background:rgba(255,0,255,0.6);z-index:10;transition:box-shadow .1s}
+#note-indicators{top:0;bottom:0;width:80px;z-index:10}
 
-#safe-zone {
-left: 0; right: 0;
-background: rgba(255,0,255,0.03);
-border-top: 1px solid rgba(255,0,255,0.1);
-border-bottom: 1px solid rgba(255,0,255,0.1);
-}
-#horizon-line { left: 0; right: 0; height: 1px; background: rgba(255,180,0,0.4); }
-#scan-line {
-top: 0; bottom: 0; width: 2px;
-background: rgba(255,0,255,0.6);
-z-index: 10;
-transition: box-shadow 0.1s;
-}
-#note-indicators { top: 0; bottom: 0; width: 80px; z-index: 10; }
+.note-row{position:absolute;left:0;transform:translateY(-50%);
+display:flex;align-items:center;gap:5px;opacity:.15;transition:opacity .1s}
+.note-bar{min-width:2px;min-height:2px;border-radius:2px;
+transition:width .06s,height .06s,background .06s,box-shadow .12s}
+.note-label{font-size:9px;letter-spacing:.5px;white-space:nowrap;
+color:rgba(255,200,255,.25);transition:color .1s}
 
-.note-row {
-position: absolute; left: 0; transform: translateY(-50%);
-display: flex; align-items: center; gap: 5px;
-opacity: 0.15; transition: opacity 0.1s;
-}
-.note-bar {
-min-width: 2px; min-height: 2px; border-radius: 2px;
-transition: width 0.06s, height 0.06s, background 0.06s, box-shadow 0.12s;
-}
-.note-label {
-font-size: 9px; letter-spacing: 0.5px; white-space: nowrap;
-color: rgba(255,200,255,0.25); transition: color 0.1s;
-}
-#label-top {
-top: max(12px, env(safe-area-inset-top, 12px)); left: 12px;
-color: rgba(255,200,255,0.5); font-size: 10px; letter-spacing: 1.5px;
-text-transform: uppercase; z-index: 10;
-}
-#label-safe { right: 12px; color: rgba(255,180,0,0.3); font-size: 9px; letter-spacing: 1px; }
+#label-top{top:max(12px,env(safe-area-inset-top,12px));left:12px;
+color:rgba(255,200,255,.5);font-size:10px;letter-spacing:1.5px;text-transform:uppercase;z-index:10}
+#label-safe{right:12px;color:rgba(255,180,0,.3);font-size:9px;letter-spacing:1px}
 
-.running-only { display: none; }
-body.running .running-only { display: block; }
-body.running #start-screen { display: none; }
+.running-only{display:none}
+body.running .running-only{display:block}
+body.running #start-screen{display:none}
 
-#error-screen {
-display: none; flex-direction: column; align-items: center; justify-content: center;
-gap: 16px; padding: 32px; text-align: center;
+#error-screen{display:none;flex-direction:column;align-items:center;justify-content:center;
+gap:16px;padding:32px;text-align:center}
+#error-screen .err-msg{color:rgba(255,100,100,.8);font-size:13px}
+#error-screen .err-hint{color:rgba(255,255,255,.3);font-size:11px;max-width:300px;line-height:1.7}
+
+/* ── Settings Panel ── */
+#settings-btn{
+position:absolute;top:max(12px,env(safe-area-inset-top,12px));right:12px;
+width:36px;height:36px;border-radius:8px;border:1px solid rgba(255,0,255,.25);
+background:rgba(0,0,0,.4);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+color:rgba(255,200,255,.7);font-size:18px;cursor:pointer;z-index:40;
+display:flex;align-items:center;justify-content:center;
+-webkit-tap-highlight-color:transparent;pointer-events:auto;
 }
-#error-screen .err-msg { color: rgba(255,100,100,0.8); font-size: 13px; }
-#error-screen .err-hint { color: rgba(255,255,255,0.3); font-size: 11px; max-width: 300px; line-height: 1.7; }
+#settings-btn:active{background:rgba(255,0,255,.15)}
+
+#settings-panel{
+position:absolute;top:0;right:0;bottom:0;width:260px;
+background:rgba(6,6,8,.92);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+border-left:1px solid rgba(255,0,255,.15);
+transform:translateX(100%);transition:transform .25s ease;
+z-index:35;padding:max(60px,env(safe-area-inset-top,60px)) 16px 24px;
+overflow-y:auto;pointer-events:auto;
+}
+#settings-panel.open{transform:translateX(0)}
+.setting-group{margin-bottom:20px}
+.setting-group-label{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;
+color:rgba(255,200,255,.35);margin-bottom:10px}
+.setting-row{display:flex;align-items:center;justify-content:space-between;
+padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.setting-name{font-size:11px;color:rgba(255,255,255,.6)}
+.setting-hint{font-size:9px;color:rgba(255,255,255,.25);margin-top:2px}
+
+/* Toggle switch */
+.toggle{position:relative;width:40px;height:22px;flex-shrink:0;cursor:pointer;
+-webkit-tap-highlight-color:transparent}
+.toggle input{display:none}
+.toggle .track{position:absolute;inset:0;border-radius:11px;
+background:rgba(255,255,255,.1);transition:background .2s}
+.toggle input:checked+.track{background:rgba(255,0,255,.4)}
+.toggle .thumb{position:absolute;top:2px;left:2px;width:18px;height:18px;
+border-radius:9px;background:#fff;transition:transform .2s;
+box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.toggle input:checked~.thumb{transform:translateX(18px)}
+
+/* Slider */
+.setting-slider{width:100%;margin-top:6px;-webkit-appearance:none;appearance:none;
+height:3px;border-radius:2px;background:rgba(255,255,255,.1);outline:none}
+.setting-slider::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;
+border-radius:8px;background:rgba(255,0,255,.6);border:2px solid rgba(255,200,255,.5);cursor:pointer}
 </style>
 
 </head>
@@ -115,7 +125,63 @@ gap: 16px; padding: 32px; text-align: center;
   <div id="note-indicators" class="overlay running-only"></div>
   <div id="label-top" class="overlay running-only">scan line instrument</div>
   <div id="label-safe" class="overlay running-only">safe zone ▾</div>
-  <button class="btn btn-stop running-only" id="stop-btn">■&ensp;stop</button>
+
+<button id="settings-btn" class="running-only">⚙</button>
+
+  <div id="settings-panel">
+    <div class="setting-group">
+      <div class="setting-group-label">Sound Engine</div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-name">Color Mode</div>
+          <div class="setting-hint">Hue → pitch zone, saturation → brightness</div>
+        </div>
+        <label class="toggle"><input type="checkbox" id="opt-color" checked>
+          <div class="track"></div><div class="thumb"></div></label>
+      </div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-name">Pluck Transients</div>
+          <div class="setting-hint">Sharp edges trigger bell/pluck tones</div>
+        </div>
+        <label class="toggle"><input type="checkbox" id="opt-pluck" checked>
+          <div class="track"></div><div class="thumb"></div></label>
+      </div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-name">Delay</div>
+          <div class="setting-hint">Ping-pong echo</div>
+        </div>
+        <label class="toggle"><input type="checkbox" id="opt-delay" checked>
+          <div class="track"></div><div class="thumb"></div></label>
+      </div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-name">Pad Layer</div>
+          <div class="setting-hint">Ambient swells with scene energy</div>
+        </div>
+        <label class="toggle"><input type="checkbox" id="opt-pad" checked>
+          <div class="track"></div><div class="thumb"></div></label>
+      </div>
+    </div>
+    <div class="setting-group">
+      <div class="setting-group-label">Mix</div>
+      <div class="setting-row" style="flex-direction:column;align-items:stretch">
+        <div class="setting-name">Reverb Send</div>
+        <input type="range" class="setting-slider" id="opt-reverb" min="0" max="100" value="40">
+      </div>
+      <div class="setting-row" style="flex-direction:column;align-items:stretch">
+        <div class="setting-name">Sensitivity</div>
+        <input type="range" class="setting-slider" id="opt-sens" min="0" max="100" value="70">
+      </div>
+      <div class="setting-row" style="flex-direction:column;align-items:stretch">
+        <div class="setting-name">Pluck Volume</div>
+        <input type="range" class="setting-slider" id="opt-pluck-vol" min="0" max="100" value="55">
+      </div>
+    </div>
+  </div>
+
+<button class="btn btn-stop running-only" id="stop-btn">■ stop</button>
 
   <div id="start-screen">
     <div class="line"></div>
@@ -133,275 +199,348 @@ gap: 16px; padding: 32px; text-align: center;
 </div>
 
 <script>
-// ── Scale (wider range, Bb major / F mixolydian) ───────────────
+// ── Scale ──────────────────────────────────────────────────────
 const SCALE = [
-  { note: "F2",  freq: 87.31  },
-  { note: "Bb2", freq: 116.54 },
-  { note: "C3",  freq: 130.81 },
-  { note: "D3",  freq: 146.83 },
-  { note: "F3",  freq: 174.61 },
-  { note: "G3",  freq: 196.00 },
-  { note: "Bb3", freq: 233.08 },
-  { note: "C4",  freq: 261.63 },
-  { note: "D4",  freq: 293.66 },
-  { note: "F4",  freq: 349.23 },
-  { note: "G4",  freq: 392.00 },
-  { note: "Bb4", freq: 466.16 },
-  { note: "C5",  freq: 523.25 },
-  { note: "D5",  freq: 587.33 },
-  { note: "F5",  freq: 698.46 },
+  { note:"F2",  freq:87.31,  warm:1.0, cool:0.2 },
+  { note:"Bb2", freq:116.54, warm:0.9, cool:0.3 },
+  { note:"C3",  freq:130.81, warm:0.7, cool:0.5 },
+  { note:"D3",  freq:146.83, warm:0.8, cool:0.4 },
+  { note:"F3",  freq:174.61, warm:0.9, cool:0.3 },
+  { note:"G3",  freq:196.00, warm:0.6, cool:0.6 },
+  { note:"Bb3", freq:233.08, warm:0.5, cool:0.7 },
+  { note:"C4",  freq:261.63, warm:0.4, cool:0.7 },
+  { note:"D4",  freq:293.66, warm:0.5, cool:0.6 },
+  { note:"F4",  freq:349.23, warm:0.3, cool:0.8 },
+  { note:"G4",  freq:392.00, warm:0.3, cool:0.9 },
+  { note:"Bb4", freq:466.16, warm:0.2, cool:1.0 },
+  { note:"C5",  freq:523.25, warm:0.2, cool:0.9 },
+  { note:"D5",  freq:587.33, warm:0.3, cool:0.8 },
+  { note:"F5",  freq:698.46, warm:0.2, cool:1.0 },
 ];
 
-const DRONE_BASE = 87.31;
-const SCAN_X = 0.62;
-const SAFE_TOP = 0.28;
-const SAFE_BOT = 0.72;
-const PW = 320, PH = 240;
-const HORIZON_SMOOTH = 0.91;
-const BG_RATE = 0.008;
-const ENERGY_THRESH = 4;
-const NOTE_ATTACK = 0.04;
-const NOTE_RELEASE = 0.8;
-const E_UP = 0.55;
-const E_DN = 0.94;
-const SCAN_COLS = 5;
+const DRONE_BASE=87.31, SCAN_X=0.62, SAFE_TOP=0.28, SAFE_BOT=0.72;
+const PW=320, PH=240, HORIZON_SM=0.91, BG_RATE=0.008;
+const SCAN_COLS=5;
 
-let audio = null, stream = null, raf = null;
-let bgModel = [], smoothHorizon = 0.5;
-let smoothEnergies = new Array(SCALE.length).fill(0);
-let globalEnergy = 0, prevColLum = null;
+// ── Settings (live-read each frame) ────────────────────────────
+const opt = {
+  get color()    { return document.getElementById("opt-color").checked },
+  get pluck()    { return document.getElementById("opt-pluck").checked },
+  get delay()    { return document.getElementById("opt-delay").checked },
+  get pad()      { return document.getElementById("opt-pad").checked },
+  get reverb()   { return document.getElementById("opt-reverb").value / 100 },
+  get sens()     { return document.getElementById("opt-sens").value / 100 },
+  get pluckVol() { return document.getElementById("opt-pluck-vol").value / 100 },
+};
 
-const videoEl  = document.getElementById("video-el");
-const procC    = document.getElementById("process-canvas");
-const camC     = document.getElementById("camera-canvas");
-const glowC    = document.getElementById("glow-canvas");
-const safezone = document.getElementById("safe-zone");
-const hLine    = document.getElementById("horizon-line");
-const sLine    = document.getElementById("scan-line");
-const noteCont = document.getElementById("note-indicators");
-const labelS   = document.getElementById("label-safe");
+let audio=null, stream=null, raf=null;
+let bgModel=[], smoothHorizon=0.5;
+let smoothEnergies=new Array(SCALE.length).fill(0);
+let globalEnergy=0, prevColLum=null, prevColDelta=null;
+let zoneHue=new Array(SCALE.length).fill(0);
+let zoneSat=new Array(SCALE.length).fill(0);
 
-procC.width = PW; procC.height = PH;
-const pCtx  = procC.getContext("2d", { willReadFrequently: true });
-const camCtx = camC.getContext("2d");
-const glCtx  = glowC.getContext("2d");
+// ── DOM ────────────────────────────────────────────────────────
+const videoEl=document.getElementById("video-el");
+const procC=document.getElementById("process-canvas");
+const camC=document.getElementById("camera-canvas");
+const glowC=document.getElementById("glow-canvas");
+const hLine=document.getElementById("horizon-line");
+const sLine=document.getElementById("scan-line");
+const noteCont=document.getElementById("note-indicators");
+const labelS=document.getElementById("label-safe");
 
-safezone.style.top = (SAFE_TOP*100)+"%";
-safezone.style.height = ((SAFE_BOT-SAFE_TOP)*100)+"%";
-sLine.style.left = (SCAN_X*100)+"%";
-noteCont.style.left = "calc("+(SCAN_X*100)+"% + 10px)";
-labelS.style.top = "calc("+(SAFE_TOP*100)+"% - 16px)";
+procC.width=PW;procC.height=PH;
+const pCtx=procC.getContext("2d",{willReadFrequently:true});
+const camCtx=camC.getContext("2d");
+const glCtx=glowC.getContext("2d");
 
-const noteRows = SCALE.map((n,i) => {
-  const row = document.createElement("div");
-  row.className = "note-row";
-  row.style.top = (1-(i+0.5)/SCALE.length)*100+"%";
-  const bar = document.createElement("div");
-  bar.className = "note-bar";
-  const lbl = document.createElement("span");
-  lbl.className = "note-label";
-  lbl.textContent = n.note;
-  row.appendChild(bar); row.appendChild(lbl);
-  noteCont.appendChild(row);
-  return { row, bar, lbl };
+document.getElementById("safe-zone").style.cssText=`top:${SAFE_TOP*100}%;height:${(SAFE_BOT-SAFE_TOP)*100}%`;
+sLine.style.left=(SCAN_X*100)+"%";
+noteCont.style.left="calc("+(SCAN_X*100)+"% + 10px)";
+labelS.style.top="calc("+(SAFE_TOP*100)+"% - 16px)";
+
+// Settings panel toggle
+let panelOpen=false;
+document.getElementById("settings-btn").addEventListener("click",e=>{
+  e.stopPropagation();
+  panelOpen=!panelOpen;
+  document.getElementById("settings-panel").classList.toggle("open",panelOpen);
+});
+// Close panel when tapping outside it
+document.addEventListener("click",e=>{
+  if(panelOpen && !document.getElementById("settings-panel").contains(e.target)
+     && e.target.id!=="settings-btn"){
+    panelOpen=false;
+    document.getElementById("settings-panel").classList.remove("open");
+  }
+});
+
+// Note indicators
+const noteRows=SCALE.map((n,i)=>{
+  const row=document.createElement("div");row.className="note-row";
+  row.style.top=(1-(i+0.5)/SCALE.length)*100+"%";
+  const bar=document.createElement("div");bar.className="note-bar";
+  const lbl=document.createElement("span");lbl.className="note-label";lbl.textContent=n.note;
+  row.appendChild(bar);row.appendChild(lbl);noteCont.appendChild(row);
+  return{row,bar,lbl};
 });
 
 // ── Audio ──────────────────────────────────────────────────────
-function makeIR(ctx, dur, decay, bright) {
-  const len = ctx.sampleRate * dur;
-  const buf = ctx.createBuffer(2, len, ctx.sampleRate);
-  for (let ch = 0; ch < 2; ch++) {
-    const d = buf.getChannelData(ch);
-    for (let i = 0; i < len; i++) {
-      const n = Math.random()*2-1;
-      const env = Math.pow(1-i/len, decay);
-      d[i] = (n*env + (i>0 ? d[i-1]*bright : 0)) / (1+bright);
-    }
-  }
+function makeIR(ctx,dur,decay,bright){
+  const len=ctx.sampleRate*dur,buf=ctx.createBuffer(2,len,ctx.sampleRate);
+  for(let ch=0;ch<2;ch++){const d=buf.getChannelData(ch);
+    for(let i=0;i<len;i++){const n=Math.random()*2-1,env=Math.pow(1-i/len,decay);
+      d[i]=(n*env+(i>0?d[i-1]*bright:0))/(1+bright);}}
   return buf;
 }
 
-function buildAudio() {
-  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+function buildAudio(){
+  const ctx=new(window.AudioContext||window.webkitAudioContext)();
 
-  const comp = ctx.createDynamicsCompressor();
-  comp.threshold.value=-20; comp.knee.value=10; comp.ratio.value=5;
-  comp.attack.value=0.003; comp.release.value=0.12;
+  const comp=ctx.createDynamicsCompressor();
+  comp.threshold.value=-20;comp.knee.value=10;comp.ratio.value=5;
+  comp.attack.value=0.003;comp.release.value=0.12;
   comp.connect(ctx.destination);
 
-  const master = ctx.createGain();
-  master.gain.value = 0.8;
-  master.connect(comp);
+  const master=ctx.createGain();master.gain.value=0.8;master.connect(comp);
 
   // Reverb
-  const reverb = ctx.createConvolver();
-  reverb.buffer = makeIR(ctx, 3.5, 1.8, 0.6);
-  const revSend = ctx.createGain();
-  revSend.gain.value = 0.40;
-  reverb.connect(revSend); revSend.connect(master);
+  const reverb=ctx.createConvolver();reverb.buffer=makeIR(ctx,3.5,1.8,0.6);
+  const revSend=ctx.createGain();revSend.gain.value=0.40;
+  reverb.connect(revSend);revSend.connect(master);
 
-  // Ping-pong delay
-  const dlL = ctx.createDelay(2); dlL.delayTime.value = 0.375;
-  const dlR = ctx.createDelay(2); dlR.delayTime.value = 0.5;
-  const dlFb = ctx.createGain(); dlFb.gain.value = 0.30;
-  const dlSend = ctx.createGain(); dlSend.gain.value = 0.20;
-  const dlOut = ctx.createGain(); dlOut.gain.value = 0.35;
-  const dlFilt = ctx.createBiquadFilter();
-  dlFilt.type = "lowpass"; dlFilt.frequency.value = 2200;
-  dlSend.connect(dlL); dlL.connect(dlFilt); dlFilt.connect(dlR);
-  dlR.connect(dlFb); dlFb.connect(dlL);
-  dlL.connect(dlOut); dlR.connect(dlOut);
-  dlOut.connect(master); dlOut.connect(reverb);
+  // Delay
+  const dlL=ctx.createDelay(2);dlL.delayTime.value=0.375;
+  const dlR=ctx.createDelay(2);dlR.delayTime.value=0.5;
+  const dlFb=ctx.createGain();dlFb.gain.value=0.30;
+  const dlSend=ctx.createGain();dlSend.gain.value=0.20;
+  const dlOut=ctx.createGain();dlOut.gain.value=0.35;
+  const dlFilt=ctx.createBiquadFilter();dlFilt.type="lowpass";dlFilt.frequency.value=2200;
+  dlSend.connect(dlL);dlL.connect(dlFilt);dlFilt.connect(dlR);
+  dlR.connect(dlFb);dlFb.connect(dlL);
+  dlL.connect(dlOut);dlR.connect(dlOut);
+  dlOut.connect(master);dlOut.connect(reverb);
 
-  const dry = ctx.createGain();
-  dry.gain.value = 0.60;
-  dry.connect(master);
+  const dry=ctx.createGain();dry.gain.value=0.60;dry.connect(master);
 
-  // Drone (3 detuned triangles + sub sine)
-  const droneG = ctx.createGain(); droneG.gain.value = 0;
-  const droneF = ctx.createBiquadFilter();
-  droneF.type = "lowpass"; droneF.frequency.value = 420; droneF.Q.value = 1.2;
-
-  const droneOscs = [
-    { type:"triangle", det:0 },
-    { type:"triangle", det:4 },
-    { type:"triangle", det:-4 },
-    { type:"sine", det:0, sub:true },
-  ].map(({type,det,sub}) => {
-    const o = ctx.createOscillator();
-    o.type = type;
-    o.frequency.value = DRONE_BASE * (sub ? 0.5 : 1);
-    o.detune.value = det;
-    const g = ctx.createGain(); g.gain.value = sub ? 0.5 : 1;
-    o.connect(g); g.connect(droneG); o.start();
-    return o;
+  // Drone
+  const droneG=ctx.createGain();droneG.gain.value=0;
+  const droneF=ctx.createBiquadFilter();
+  droneF.type="lowpass";droneF.frequency.value=420;droneF.Q.value=1.2;
+  const droneOscs=[
+    {type:"triangle",det:0},{type:"triangle",det:4},{type:"triangle",det:-4},
+    {type:"sine",det:0,sub:true}
+  ].map(({type,det,sub})=>{
+    const o=ctx.createOscillator();o.type=type;
+    o.frequency.value=DRONE_BASE*(sub?0.5:1);o.detune.value=det;
+    const g=ctx.createGain();g.gain.value=sub?0.5:1;
+    o.connect(g);g.connect(droneG);o.start();return o;
   });
+  const lfo=ctx.createOscillator();lfo.type="sine";lfo.frequency.value=0.08;
+  const lfoD=ctx.createGain();lfoD.gain.value=160;
+  lfo.connect(lfoD);lfoD.connect(droneF.frequency);lfo.start();
+  const trem=ctx.createOscillator();trem.type="sine";trem.frequency.value=0.25;
+  const tremD=ctx.createGain();tremD.gain.value=0.015;
+  trem.connect(tremD);tremD.connect(droneG.gain);trem.start();
+  droneG.connect(droneF);droneF.connect(dry);droneF.connect(reverb);
+  droneG.gain.setTargetAtTime(0.16,ctx.currentTime+0.1,1.0);
 
-  const lfo = ctx.createOscillator();
-  lfo.type="sine"; lfo.frequency.value=0.08;
-  const lfoD = ctx.createGain(); lfoD.gain.value=160;
-  lfo.connect(lfoD); lfoD.connect(droneF.frequency); lfo.start();
+  // Voices — FM
+  const voices=SCALE.map(({freq})=>{
+    const car=ctx.createOscillator();car.type="sine";car.frequency.value=freq;
+    const mod=ctx.createOscillator();mod.type="sine";
+    const ratio=freq<200?1:freq<400?2:3;
+    mod.frequency.value=freq*ratio;
+    const modD=ctx.createGain();modD.gain.value=freq<200?freq*0.3:freq*0.5;
+    mod.connect(modD);modD.connect(car.frequency);
 
-  const trem = ctx.createOscillator();
-  trem.type="sine"; trem.frequency.value=0.25;
-  const tremD = ctx.createGain(); tremD.gain.value=0.015;
-  trem.connect(tremD); tremD.connect(droneG.gain); trem.start();
+    const shim=ctx.createOscillator();shim.type="sine";shim.frequency.value=freq*2.01;
+    const shimG=ctx.createGain();shimG.gain.value=0.08;shim.connect(shimG);
 
-  droneG.connect(droneF);
-  droneF.connect(dry); droneF.connect(reverb);
-  droneG.gain.setTargetAtTime(0.16, ctx.currentTime+0.1, 1.0);
+    const fifth=ctx.createOscillator();fifth.type="sine";fifth.frequency.value=freq*1.498;
+    const fifthG=ctx.createGain();fifthG.gain.value=0.04;fifth.connect(fifthG);
 
-  // Voices — FM synthesis
-  const voices = SCALE.map(({freq}) => {
-    const car = ctx.createOscillator(); car.type="sine"; car.frequency.value=freq;
-    const mod = ctx.createOscillator(); mod.type="sine";
-    const ratio = freq<200?1:freq<400?2:3;
-    mod.frequency.value = freq * ratio;
-    const modD = ctx.createGain();
-    modD.gain.value = freq<200 ? freq*0.3 : freq*0.5;
-    mod.connect(modD); modD.connect(car.frequency);
+    const gain=ctx.createGain();gain.gain.value=0;
+    const filt=ctx.createBiquadFilter();
+    filt.type="lowpass";filt.frequency.value=freq*2;filt.Q.value=0.7;
 
-    const shim = ctx.createOscillator(); shim.type="sine"; shim.frequency.value=freq*2.01;
-    const shimG = ctx.createGain(); shimG.gain.value=0.08; shim.connect(shimG);
-
-    const fifth = ctx.createOscillator(); fifth.type="sine"; fifth.frequency.value=freq*1.498;
-    const fifthG = ctx.createGain(); fifthG.gain.value=0.04; fifth.connect(fifthG);
-
-    const gain = ctx.createGain(); gain.gain.value=0;
-    const filt = ctx.createBiquadFilter();
-    filt.type="lowpass"; filt.frequency.value=freq*2; filt.Q.value=0.7;
-
-    car.connect(gain); shimG.connect(gain); fifthG.connect(gain);
+    car.connect(gain);shimG.connect(gain);fifthG.connect(gain);
     gain.connect(filt);
-    filt.connect(dry); filt.connect(reverb); filt.connect(dlSend);
+    filt.connect(dry);filt.connect(reverb);filt.connect(dlSend);
 
-    car.start(); mod.start(); shim.start(); fifth.start();
-    return { car, mod, modD, shim, fifth, gain, filt, energy:0, freq };
+    car.start();mod.start();shim.start();fifth.start();
+    return{car,mod,modD,shim,fifth,gain,filt,energy:0,freq,baseModDepth:modD.gain.value};
   });
 
   // Pad
-  const padG = ctx.createGain(); padG.gain.value=0;
-  const padF = ctx.createBiquadFilter();
-  padF.type="lowpass"; padF.frequency.value=800; padF.Q.value=0.3;
-  [1,1.5,2,3].forEach(r => {
-    const o = ctx.createOscillator(); o.type="sine";
-    o.frequency.value=DRONE_BASE*r; o.connect(padG); o.start();
+  const padG=ctx.createGain();padG.gain.value=0;
+  const padF=ctx.createBiquadFilter();padF.type="lowpass";padF.frequency.value=800;padF.Q.value=0.3;
+  const padOscs=[1,1.5,2,3].map(r=>{
+    const o=ctx.createOscillator();o.type="sine";o.frequency.value=DRONE_BASE*r;
+    o.connect(padG);o.start();return o;
   });
-  padG.connect(padF); padF.connect(dry); padF.connect(reverb);
+  padG.connect(padF);padF.connect(dry);padF.connect(reverb);
 
-  return { ctx, dry, reverb, dlSend, droneG, droneOscs, droneF, lfo, trem, voices, padG, padF };
+  // ── Pluck engine ──
+  // Pre-allocate a pool of pluck voices that get triggered one-shot style
+  const PLUCK_POOL=8;
+  const pluckVoices=[];
+  for(let i=0;i<PLUCK_POOL;i++){
+    const osc=ctx.createOscillator();osc.type="sine";osc.frequency.value=440;
+    // Pluck uses sharp bandpass for bell character
+    const bp=ctx.createBiquadFilter();bp.type="bandpass";bp.frequency.value=440;bp.Q.value=3;
+    const gain=ctx.createGain();gain.gain.value=0;
+    // Noise burst for attack transient
+    const noiseLen=ctx.sampleRate*0.04;
+    const noiseBuf=ctx.createBuffer(1,noiseLen,ctx.sampleRate);
+    const nd=noiseBuf.getChannelData(0);
+    for(let j=0;j<noiseLen;j++) nd[j]=(Math.random()*2-1)*Math.pow(1-j/noiseLen,8);
+
+    osc.connect(bp);bp.connect(gain);
+    gain.connect(dry);gain.connect(reverb);gain.connect(dlSend);
+    osc.start();
+
+    pluckVoices.push({osc,bp,gain,noiseBuf,busy:false,releaseTime:0});
+  }
+
+  function firePluck(freq, velocity){
+    // Find free voice
+    const now=ctx.currentTime;
+    let v=pluckVoices.find(p=>!p.busy || now>p.releaseTime);
+    if(!v) v=pluckVoices[0]; // steal oldest
+
+    const vol=velocity*opt.pluckVol*0.35;
+
+    v.osc.frequency.setValueAtTime(freq,now);
+    v.bp.frequency.setValueAtTime(freq*1.5,now);
+
+    // Sharp attack, exponential decay
+    v.gain.gain.cancelScheduledValues(now);
+    v.gain.gain.setValueAtTime(0,now);
+    v.gain.gain.linearRampToValueAtTime(vol,now+0.005);
+    v.gain.gain.exponentialRampToValueAtTime(0.001,now+0.8);
+
+    // Noise transient
+    const nSrc=ctx.createBufferSource();
+    nSrc.buffer=v.noiseBuf;
+    const nGain=ctx.createGain();nGain.gain.value=vol*0.6;
+    nSrc.connect(nGain);
+    const nFilt=ctx.createBiquadFilter();nFilt.type="highpass";nFilt.frequency.value=freq*0.8;
+    nGain.connect(nFilt);nFilt.connect(dry);nFilt.connect(reverb);
+    nSrc.start(now);
+
+    v.busy=true;
+    v.releaseTime=now+0.8;
+  }
+
+  return{ctx,dry,reverb,revSend,dlSend,dlOut,droneG,droneOscs,droneF,lfo,trem,
+    voices,padG,padF,padOscs,firePluck,pluckVoices};
 }
 
 // ── Vision ─────────────────────────────────────────────────────
-function lum(r,g,b) { return 0.299*r+0.587*g+0.114*b; }
+function lum(r,g,b){return 0.299*r+0.587*g+0.114*b}
 
-function detectHorizon(d, w, h) {
-  const p = d.data, top = Math.floor(h*SAFE_TOP), bot = Math.floor(h*SAFE_BOT);
-  const step = Math.max(1,Math.floor(w/40));
-  const rL = [];
-  for (let y=top;y<bot;y++){let s=0,c=0;for(let x=0;x<w;x+=step){const i=(y*w+x)*4;s+=lum(p[i],p[i+1],p[i+2]);c++;}rL.push(s/c);}
-  let mG=0, hR=Math.floor((top+bot)/2);
+function rgb2hsl(r,g,b){
+  r/=255;g/=255;b/=255;
+  const mx=Math.max(r,g,b),mn=Math.min(r,g,b),l=(mx+mn)/2;
+  if(mx===mn) return[0,0,l];
+  const d=mx-mn,s=l>0.5?d/(2-mx-mn):d/(mx+mn);
+  let h;
+  if(mx===r) h=((g-b)/d+(g<b?6:0))/6;
+  else if(mx===g) h=((b-r)/d+2)/6;
+  else h=((r-g)/d+4)/6;
+  return[h*360,s,l];
+}
+
+function detectHorizon(d,w,h){
+  const p=d.data,top=Math.floor(h*SAFE_TOP),bot=Math.floor(h*SAFE_BOT);
+  const step=Math.max(1,Math.floor(w/40)),rL=[];
+  for(let y=top;y<bot;y++){let s=0,c=0;
+    for(let x=0;x<w;x+=step){const i=(y*w+x)*4;s+=lum(p[i],p[i+1],p[i+2]);c++;}
+    rL.push(s/c);}
+  let mG=0,hR=Math.floor((top+bot)/2);
   for(let i=1;i<rL.length;i++){const g=Math.abs(rL[i]-rL[i-1]);if(g>mG){mG=g;hR=top+i;}}
   return hR/h;
 }
 
-function sampleScan(d, w, h, nZ) {
-  const p = d.data, cx = Math.floor(w*SCAN_X), half = Math.floor(SCAN_COLS/2);
-  const zH = h/nZ, energies = [], colL = [];
-  for (let z=0;z<nZ;z++){
-    const yS=Math.floor(z*zH), yE=Math.floor((z+1)*zH);
+function sampleScan(d,w,h,nZ){
+  const p=d.data,cx=Math.floor(w*SCAN_X),half=Math.floor(SCAN_COLS/2);
+  const zH=h/nZ,energies=[],colL=[],hues=[],sats=[];
+  const sensitivity=0.3+opt.sens*1.4; // 0.3-1.7 range
+  const thresh=2+8*(1-opt.sens);      // 2-10 range
+
+  for(let z=0;z<nZ;z++){
+    const yS=Math.floor(z*zH),yE=Math.floor((z+1)*zH);
     let ls=0,lsq=0,cs=0,cnt=0;
+    let hueSum=0,satSum=0,colorCnt=0;
+
     for(let y=yS;y<yE&&y<h;y++){
       for(let dx=-half;dx<=half;dx++){
-        const x=Math.min(Math.max(cx+dx,0),w-1), i=(y*w+x)*4;
-        const l=lum(p[i],p[i+1],p[i+2]);
+        const x=Math.min(Math.max(cx+dx,0),w-1),i=(y*w+x)*4;
+        const r=p[i],g=p[i+1],b=p[i+2];
+        const l=lum(r,g,b);
         ls+=l;lsq+=l*l;cnt++;
-        if(dx===0) cs+=l;
+        if(dx===0){
+          cs+=l;
+          if(opt.color){
+            const[hh,ss]=rgb2hsl(r,g,b);
+            if(ss>0.1){hueSum+=hh;satSum+=ss;colorCnt++;}
+          }
+        }
       }
     }
-    const mean=ls/cnt, std=Math.sqrt(Math.max(0,lsq/cnt-mean*mean));
+
+    const mean=ls/cnt,std=Math.sqrt(Math.max(0,lsq/cnt-mean*mean));
     const bgD=Math.abs(mean-(bgModel[z]??mean));
-    const zL=cs/((yE-yS)||1); colL.push(zL);
+    const zL=cs/((yE-yS)||1);colL.push(zL);
     const tD=prevColLum?Math.abs(zL-prevColLum[z]):0;
     bgModel[z]=bgModel[z]==null?mean:bgModel[z]*(1-BG_RATE)+mean*BG_RATE;
-    energies.push(Math.max(0, std*0.4+bgD*0.6+tD*1.2 - ENERGY_THRESH));
+
+    const raw=(std*0.4+bgD*0.6+tD*1.2)*sensitivity;
+    energies.push(Math.max(0,raw-thresh));
+
+    hues.push(colorCnt>0?hueSum/colorCnt:0);
+    sats.push(colorCnt>0?satSum/colorCnt:0);
   }
   prevColLum=colL;
-  return energies;
+  return{energies,hues,sats};
 }
 
 // ── Glow ───────────────────────────────────────────────────────
-function renderGlow(norm, tE) {
-  const w=glowC.width, h=glowC.height;
-  glCtx.clearRect(0,0,w,h);
-  const sx = Math.floor(w*SCAN_X);
-  const ga = 0.08+tE*0.35, gw = 30+tE*80;
-  const gr = glCtx.createLinearGradient(sx-gw,0,sx+gw,0);
+function renderGlow(norm,tE){
+  const w=glowC.width,h=glowC.height;glCtx.clearRect(0,0,w,h);
+  const sx=Math.floor(w*SCAN_X);
+  const ga=0.08+tE*0.35,gw=30+tE*80;
+  const gr=glCtx.createLinearGradient(sx-gw,0,sx+gw,0);
   gr.addColorStop(0,"rgba(255,0,255,0)");
   gr.addColorStop(0.4,`rgba(255,50,255,${ga*0.3})`);
   gr.addColorStop(0.5,`rgba(255,100,255,${ga})`);
   gr.addColorStop(0.6,`rgba(255,50,255,${ga*0.3})`);
   gr.addColorStop(1,"rgba(255,0,255,0)");
-  glCtx.fillStyle=gr;
-  glCtx.fillRect(sx-gw,0,gw*2,h);
+  glCtx.fillStyle=gr;glCtx.fillRect(sx-gw,0,gw*2,h);
 
   for(let i=0;i<SCALE.length;i++){
-    const e=norm[i]; if(e<0.05) continue;
-    const y=(1-(i+0.5)/SCALE.length)*h;
-    const r=3+e*14;
-    glCtx.beginPath(); glCtx.arc(sx,y,r,0,Math.PI*2);
-    glCtx.fillStyle=`rgba(255,${Math.floor(150+e*105)},${Math.floor(220-e*120)},${e*0.7})`;
-    glCtx.fill();
-    if(e>0.2){
-      glCtx.beginPath(); glCtx.arc(sx,y,r*2.5,0,Math.PI*2);
-      glCtx.fillStyle=`rgba(255,100,255,${e*0.12})`;
-      glCtx.fill();
+    const e=norm[i];if(e<0.05) continue;
+    const y=(1-(i+0.5)/SCALE.length)*h,r=3+e*14;
+    // Tint by hue if color mode on
+    let cr=255,cg=Math.floor(150+e*105),cb=Math.floor(220-e*120);
+    if(opt.color && zoneSat[i]>0.15){
+      const hu=zoneHue[i];
+      // Warm hues (reds/oranges/yellows 0-60,300-360) tint orange
+      // Cool hues (blues/greens 120-270) tint cyan
+      if((hu<80||hu>290)){cr=255;cg=Math.floor(120+e*80);cb=Math.floor(60+e*40);}
+      else if(hu>160&&hu<270){cr=Math.floor(80+e*60);cg=Math.floor(180+e*75);cb=255;}
     }
+    glCtx.beginPath();glCtx.arc(sx,y,r,0,Math.PI*2);
+    glCtx.fillStyle=`rgba(${cr},${cg},${cb},${e*0.7})`;glCtx.fill();
+    if(e>0.2){glCtx.beginPath();glCtx.arc(sx,y,r*2.5,0,Math.PI*2);
+      glCtx.fillStyle=`rgba(${cr},${cg},${cb},${e*0.12})`;glCtx.fill();}
   }
 }
 
 // ── Loop ───────────────────────────────────────────────────────
-function loop() {
+function loop(){
   if(!audio) return;
   const v=videoEl;
   pCtx.drawImage(v,0,0,PW,PH);
@@ -409,18 +548,30 @@ function loop() {
 
   const cw=camC.width,ch=camC.height,vw=v.videoWidth,vh=v.videoHeight;
   if(vw&&vh){
-    const sc=Math.max(cw/vw,ch/vh),sw=cw/sc,sh=ch/sc,sx2=(vw-sw)/2,sy2=(vh-sh)/2;
-    camCtx.drawImage(v,sx2,sy2,sw,sh,0,0,cw,ch);
+    const sc=Math.max(cw/vw,ch/vh),sw=cw/sc,sh=ch/sc;
+    camCtx.drawImage(v,(vw-sw)/2,(vh-sh)/2,sw,sh,0,0,cw,ch);
   }
 
   const rawH=detectHorizon(img,PW,PH);
-  smoothHorizon=smoothHorizon*HORIZON_SMOOTH+rawH*(1-HORIZON_SMOOTH);
+  smoothHorizon=smoothHorizon*HORIZON_SM+rawH*(1-HORIZON_SM);
 
-  const rawE=sampleScan(img,PW,PH,SCALE.length);
+  const{energies:rawE,hues,sats}=sampleScan(img,PW,PH,SCALE.length);
+  // Invert: top→highest
   const mapped=rawE.map((_,i)=>rawE[SCALE.length-1-i]);
+  const mappedH=hues.map((_,i)=>hues[SCALE.length-1-i]);
+  const mappedS=sats.map((_,i)=>sats[SCALE.length-1-i]);
+
+  // Smooth hue/sat
+  for(let i=0;i<SCALE.length;i++){
+    zoneHue[i]=zoneHue[i]*0.8+mappedH[i]*0.2;
+    zoneSat[i]=zoneSat[i]*0.8+mappedS[i]*0.2;
+  }
+
+  // Smooth energies
+  const eUp=0.55,eDn=0.94;
   smoothEnergies=smoothEnergies.map((prev,i)=>{
     const t=mapped[i]||0;
-    return t>prev?prev*E_UP+t*(1-E_UP):prev*E_DN+t*(1-E_DN);
+    return t>prev?prev*eUp+t*(1-eUp):prev*eDn+t*(1-eDn);
   });
 
   const maxE=Math.max(...smoothEnergies,1);
@@ -428,7 +579,12 @@ function loop() {
   const tE=Math.min(1,norm.reduce((a,b)=>a+b,0)/(SCALE.length*0.4));
   globalEnergy=globalEnergy*0.85+tE*0.15;
 
-  const a=audio, now=a.ctx.currentTime;
+  // Detect pluck triggers (sharp energy onset)
+  if(!prevColDelta) prevColDelta=new Array(SCALE.length).fill(0);
+  const deltas=norm.map((e,i)=>Math.max(0,e-prevColDelta[i]));
+  prevColDelta=norm.slice();
+
+  const a=audio,now=a.ctx.currentTime;
 
   // Drone
   const hOff=(smoothHorizon-0.5)*0.15;
@@ -439,33 +595,71 @@ function loop() {
   });
   a.droneF.frequency.setTargetAtTime(420+globalEnergy*600,now,0.2);
 
+  // Delay send toggle
+  a.dlOut.gain.setTargetAtTime(opt.delay?0.35:0,now,0.1);
+
+  // Reverb send
+  a.revSend.gain.setTargetAtTime(opt.reverb*0.7,now,0.15);
+
   // Voices
-  a.voices.forEach((v2,i)=>{
-    const e=norm[i], tg=e*0.18;
-    const tc=tg>v2.energy?NOTE_ATTACK:NOTE_RELEASE;
-    v2.gain.gain.setTargetAtTime(tg,now,tc);
-    const bd=v2.freq<200?v2.freq*0.3:v2.freq*0.5;
-    v2.modD.gain.setTargetAtTime(bd*(0.3+e*2),now,0.1);
-    v2.filt.frequency.setTargetAtTime(Math.min(v2.freq*(2+e*6),8000),now,0.08);
-    v2.energy=tg;
+  a.voices.forEach((vc,i)=>{
+    let e=norm[i];
+
+    // Color mode: weight energy by hue affinity
+    if(opt.color && zoneSat[i]>0.12){
+      const hu=zoneHue[i];
+      // warmness: 0-1 (warm hues near 0/360, cool near 180)
+      const warmness=1-Math.min(Math.abs(hu-0),Math.abs(hu-360),Math.abs(360-hu))/180;
+      const blend=warmness*SCALE[i].warm+(1-warmness)*SCALE[i].cool;
+      e*=(0.4+blend*0.8); // bias energy by color affinity
+
+      // Saturation modulates FM depth
+      const satBoost=0.5+zoneSat[i]*2.0;
+      const newDepth=vc.baseModDepth*(0.3+e*satBoost);
+      vc.modD.gain.setTargetAtTime(newDepth,now,0.1);
+    } else {
+      const newDepth=vc.baseModDepth*(0.3+e*2);
+      vc.modD.gain.setTargetAtTime(newDepth,now,0.1);
+    }
+
+    const tg=e*0.18;
+    const tc=tg>vc.energy?0.04:0.8;
+    vc.gain.gain.setTargetAtTime(tg,now,tc);
+    vc.filt.frequency.setTargetAtTime(Math.min(vc.freq*(2+e*6),8000),now,0.08);
+    vc.energy=tg;
+
+    // Pluck trigger
+    if(opt.pluck && deltas[i]>0.12){
+      a.firePluck(SCALE[i].freq, Math.min(1,deltas[i]*3));
+    }
   });
 
   // Pad
-  a.padG.gain.setTargetAtTime(globalEnergy*0.06,now,0.5);
+  const padTarget=opt.pad?globalEnergy*0.06:0;
+  a.padG.gain.setTargetAtTime(padTarget,now,0.5);
   a.padF.frequency.setTargetAtTime(600+globalEnergy*1800,now,0.3);
 
-  // Visuals
+  // ── Visuals ──
   hLine.style.top=(smoothHorizon*100)+"%";
-  const slG=8+globalEnergy*35, slA=0.3+globalEnergy*0.5;
-  sLine.style.boxShadow=`0 0 ${slG}px rgba(255,0,255,${slA}), 0 0 ${slG*2.5}px rgba(255,0,255,${slA*0.3})`;
+  const slG=8+globalEnergy*35,slA=0.3+globalEnergy*0.5;
+  sLine.style.boxShadow=`0 0 ${slG}px rgba(255,0,255,${slA}),0 0 ${slG*2.5}px rgba(255,0,255,${slA*0.3})`;
 
   for(let i=0;i<SCALE.length;i++){
     const e=norm[i],nr=noteRows[i];
     nr.row.style.opacity=e>0.02?0.3+e*0.7:0.12;
     nr.bar.style.width=Math.max(2,e*50)+"px";
     nr.bar.style.height=Math.max(2,3+e*12)+"px";
-    nr.bar.style.background=`rgba(255,${Math.floor(120+e*135)},${Math.floor(220-e*180)},${(0.3+e*0.7).toFixed(2)})`;
-    nr.bar.style.boxShadow=e>0.15?`0 0 ${(e*16).toFixed(0)}px rgba(255,100,255,${(e*0.6).toFixed(2)})`:"none";
+
+    // Color the bar by zone hue if color mode
+    let cr=255,cg=Math.floor(120+e*135),cb=Math.floor(220-e*180);
+    if(opt.color && zoneSat[i]>0.15){
+      const hu=zoneHue[i];
+      if(hu<80||hu>290){cr=255;cg=Math.floor(140+e*80);cb=Math.floor(80+e*40);}
+      else if(hu>160&&hu<270){cr=Math.floor(100+e*60);cg=Math.floor(200+e*55);cb=255;}
+      else{cr=Math.floor(180+e*75);cg=255;cb=Math.floor(100+e*80);}
+    }
+    nr.bar.style.background=`rgba(${cr},${cg},${cb},${(0.3+e*0.7).toFixed(2)})`;
+    nr.bar.style.boxShadow=e>0.15?`0 0 ${(e*16).toFixed(0)}px rgba(${cr},${cg},${cb},${(e*0.6).toFixed(2)})`:"none";
     nr.lbl.style.color=`rgba(255,200,255,${(0.2+e*0.8).toFixed(2)})`;
   }
 
@@ -474,20 +668,21 @@ function loop() {
 }
 
 // ── Start / Stop ───────────────────────────────────────────────
-async function start() {
-  try {
-    stream = await navigator.mediaDevices.getUserMedia({
-      video:{facingMode:"environment",width:{ideal:1280},height:{ideal:720}},audio:false
-    });
-    videoEl.srcObject=stream; await videoEl.play();
+async function start(){
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({
+      video:{facingMode:"environment",width:{ideal:1280},height:{ideal:720}},audio:false});
+    videoEl.srcObject=stream;await videoEl.play();
     function resize(){camC.width=glowC.width=window.innerWidth;camC.height=glowC.height=window.innerHeight;}
-    resize(); window.addEventListener("resize",resize);
+    resize();window.addEventListener("resize",resize);
     audio=buildAudio();
     if(audio.ctx.state==="suspended") await audio.ctx.resume();
-    bgModel=[];smoothHorizon=0.5;smoothEnergies=new Array(SCALE.length).fill(0);prevColLum=null;globalEnergy=0;
+    bgModel=[];smoothHorizon=0.5;smoothEnergies=new Array(SCALE.length).fill(0);
+    prevColLum=null;prevColDelta=null;globalEnergy=0;
+    zoneHue=new Array(SCALE.length).fill(0);zoneSat=new Array(SCALE.length).fill(0);
     document.body.classList.add("running");
     raf=requestAnimationFrame(loop);
-  } catch(err){
+  }catch(err){
     console.error(err);
     document.getElementById("err-msg").textContent=err.message||"Camera access denied";
     document.getElementById("start-screen").style.display="none";
@@ -495,16 +690,18 @@ async function start() {
   }
 }
 
-function stop() {
+function stop(){
   if(raf) cancelAnimationFrame(raf);
   if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}
   if(audio){
-    audio.droneOscs.forEach(o=>{try{o.stop();}catch(e){}});
+    audio.droneOscs.forEach(o=>{try{o.stop()}catch(e){}});
     audio.lfo.stop();audio.trem.stop();
-    audio.voices.forEach(v=>{try{v.car.stop();v.mod.stop();v.shim.stop();v.fifth.stop();}catch(e){}});
+    audio.voices.forEach(v=>{try{v.car.stop();v.mod.stop();v.shim.stop();v.fifth.stop()}catch(e){}});
+    audio.padOscs.forEach(o=>{try{o.stop()}catch(e){}});
+    audio.pluckVoices.forEach(p=>{try{p.osc.stop()}catch(e){}});
     audio.ctx.close();audio=null;
   }
-  bgModel=[];prevColLum=null;
+  bgModel=[];prevColLum=null;prevColDelta=null;
   document.body.classList.remove("running");
   document.getElementById("start-screen").style.display="flex";
 }
@@ -515,7 +712,10 @@ document.getElementById("back-btn").addEventListener("click",()=>{
   document.getElementById("error-screen").style.display="none";
   document.getElementById("start-screen").style.display="flex";
 });
-document.addEventListener("touchmove",e=>e.preventDefault(),{passive:false});
+document.addEventListener("touchmove",e=>{
+  if(!document.getElementById("settings-panel").contains(e.target))
+    e.preventDefault();
+},{passive:false});
 </script>
 
 </body>
