@@ -130,6 +130,17 @@ border-radius:8px;background:rgba(255,0,255,.6);border:2px solid rgba(255,200,25
 
   <div id="settings-panel">
     <div class="setting-group">
+      <div class="setting-group-label">Scene</div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-name">Indoor Mode</div>
+          <div class="setting-hint">Edge contrast detection, no horizon</div>
+        </div>
+        <label class="toggle"><input type="checkbox" id="opt-indoor">
+          <div class="track"></div><div class="thumb"></div></label>
+      </div>
+    </div>
+    <div class="setting-group">
       <div class="setting-group-label">Sound Engine</div>
       <div class="setting-row">
         <div>
@@ -224,6 +235,7 @@ const SCAN_COLS=5;
 
 // ── Settings (live-read each frame) ────────────────────────────
 const opt = {
+  get indoor()   { return document.getElementById("opt-indoor").checked },
   get color()    { return document.getElementById("opt-color").checked },
   get pluck()    { return document.getElementById("opt-pluck").checked },
   get delay()    { return document.getElementById("opt-delay").checked },
@@ -240,6 +252,8 @@ let globalEnergy=0, prevColLum=null, prevColDelta=null;
 let pluckCooldown=new Array(SCALE.length).fill(0);
 let zoneHue=new Array(SCALE.length).fill(0);
 let zoneSat=new Array(SCALE.length).fill(0);
+let smoothEnergyCoM=0.5; // indoor: energy center-of-mass for drone
+let zoneMeans=new Array(SCALE.length).fill(128); // for indoor edge detection
 
 // ── DOM ────────────────────────────────────────────────────────
 const videoEl=document.getElementById("video-el");
@@ -250,6 +264,7 @@ const hLine=document.getElementById("horizon-line");
 const sLine=document.getElementById("scan-line");
 const noteCont=document.getElementById("note-indicators");
 const labelS=document.getElementById("label-safe");
+const safeZone=document.getElementById("safe-zone");
 
 procC.width=PW;procC.height=PH;
 const pCtx=procC.getContext("2d",{willReadFrequently:true});
@@ -538,6 +553,73 @@ function sampleScan(d,w,h,nZ){
   return{energies,hues,sats};
 }
 
+// ── Indoor Vision: edge-contrast + competitive normalization ───
+function sampleScanIndoor(d,w,h,nZ){
+  const p=d.data,cx=Math.floor(w*SCAN_X),half=Math.floor(SCAN_COLS/2);
+  const zH=h/nZ,hues=[],sats=[];
+  const sensitivity=0.3+opt.sens*1.4;
+  const thresh=1+5*(1-opt.sens);
+
+  // First pass: compute mean luminance per zone
+  const means=[];
+  for(let z=0;z<nZ;z++){
+    const yS=Math.floor(z*zH),yE=Math.floor((z+1)*zH);
+    let ls=0,cnt=0;
+    let hueSum=0,satSum=0,colorCnt=0;
+    for(let y=yS;y<yE&&y<h;y++){
+      for(let dx=-half;dx<=half;dx++){
+        const x=Math.min(Math.max(cx+dx,0),w-1),i=(y*w+x)*4;
+        ls+=lum(p[i],p[i+1],p[i+2]);cnt++;
+        if(dx===0 && opt.color){
+          const[hh,ss]=rgb2hsl(p[i],p[i+1],p[i+2]);
+          if(ss>0.1){hueSum+=hh;satSum+=ss;colorCnt++;}
+        }
+      }
+    }
+    means.push(ls/cnt);
+    hues.push(colorCnt>0?hueSum/colorCnt:0);
+    sats.push(colorCnt>0?satSum/colorCnt:0);
+  }
+
+  // Second pass: energy = gradient between adjacent zones (edge detection)
+  const rawEdge=[];
+  for(let z=0;z<nZ;z++){
+    let grad=0;
+    if(z>0) grad=Math.max(grad,Math.abs(means[z]-means[z-1]));
+    if(z<nZ-1) grad=Math.max(grad,Math.abs(means[z]-means[z+1]));
+    // Also add temporal diff if available
+    const tD=prevColLum?Math.abs(means[z]-(prevColLum[z]||means[z])):0;
+    const raw=(grad*1.0+tD*0.8)*sensitivity;
+    rawEdge.push(Math.max(0,raw-thresh));
+  }
+
+  // Competitive normalization: only top 5 zones get full energy
+  const TOP_N=5;
+  const sorted=[...rawEdge].sort((a,b)=>b-a);
+  const cutoff=sorted[Math.min(TOP_N,sorted.length-1)]||0;
+  const energies=rawEdge.map(e=>{
+    if(e>=cutoff && e>0) return e;
+    return e*0.15; // suppress non-top zones to 15%
+  });
+
+  // Compute energy center-of-mass (for drone)
+  let weightedSum=0,totalWeight=0;
+  for(let z=0;z<nZ;z++){
+    const yNorm=(z+0.5)/nZ; // 0=top, 1=bottom
+    weightedSum+=yNorm*energies[z];
+    totalWeight+=energies[z];
+  }
+  const energyCoM=totalWeight>0.01?weightedSum/totalWeight:0.5;
+  smoothEnergyCoM=smoothEnergyCoM*0.97+energyCoM*0.03;
+
+  // Store means for temporal diff next frame
+  prevColLum=means;
+  // Store for zoneMeans global access
+  for(let z=0;z<nZ;z++) zoneMeans[z]=means[z];
+
+  return{energies,hues,sats};
+}
+
 // ── Glow ───────────────────────────────────────────────────────
 function renderGlow(norm,tE){
   const w=glowC.width,h=glowC.height;glCtx.clearRect(0,0,w,h);
@@ -574,6 +656,8 @@ function renderGlow(norm,tE){
 function loop(){
   if(!audio) return;
   const v=videoEl;
+  const indoor=opt.indoor;
+
   pCtx.drawImage(v,0,0,PW,PH);
   const img=pCtx.getImageData(0,0,PW,PH);
 
@@ -583,10 +667,18 @@ function loop(){
     camCtx.drawImage(v,(vw-sw)/2,(vh-sh)/2,sw,sh,0,0,cw,ch);
   }
 
-  const rawH=detectHorizon(img,PW,PH);
-  smoothHorizon=smoothHorizon*HORIZON_SM+rawH*(1-HORIZON_SM);
+  // ── Horizon / drone source ──
+  if(!indoor){
+    const rawH=detectHorizon(img,PW,PH);
+    smoothHorizon=smoothHorizon*HORIZON_SM+rawH*(1-HORIZON_SM);
+  }
+  // Indoor: smoothEnergyCoM is updated inside sampleScanIndoor
 
-  const{energies:rawE,hues,sats}=sampleScan(img,PW,PH,SCALE.length);
+  // ── Scan ──
+  const{energies:rawE,hues,sats}=indoor
+    ? sampleScanIndoor(img,PW,PH,SCALE.length)
+    : sampleScan(img,PW,PH,SCALE.length);
+
   // Invert: top→highest
   const mapped=rawE.map((_,i)=>rawE[SCALE.length-1-i]);
   const mappedH=hues.map((_,i)=>hues[SCALE.length-1-i]);
@@ -598,32 +690,45 @@ function loop(){
     zoneSat[i]=zoneSat[i]*0.8+mappedS[i]*0.2;
   }
 
-  // Smooth energies
-  const eUp=0.55,eDn=0.94;
+  // Smooth energies (indoor uses heavier smoothing)
+  const eUp=indoor?0.65:0.55;
+  const eDn=indoor?0.96:0.94;
   smoothEnergies=smoothEnergies.map((prev,i)=>{
     const t=mapped[i]||0;
     return t>prev?prev*eUp+t*(1-eUp):prev*eDn+t*(1-eDn);
   });
 
   const maxE=Math.max(...smoothEnergies,1);
-  const norm=smoothEnergies.map(e=>Math.min(1,e/Math.max(maxE*0.5,18)));
+  const normFloor=indoor?12:18;
+  const norm=smoothEnergies.map(e=>Math.min(1,e/Math.max(maxE*0.5,normFloor)));
   const tE=Math.min(1,norm.reduce((a,b)=>a+b,0)/(SCALE.length*0.4));
   globalEnergy=globalEnergy*0.85+tE*0.15;
 
-  // Detect pluck triggers (sharp energy onset)
+  // Detect pluck triggers
   if(!prevColDelta) prevColDelta=new Array(SCALE.length).fill(0);
   const deltas=norm.map((e,i)=>Math.max(0,e-prevColDelta[i]));
   prevColDelta=norm.slice();
 
   const a=audio,now=a.ctx.currentTime;
 
-  // Drone
-  const hOff=(smoothHorizon-0.5)*0.15;
-  const dp=DRONE_BASE*(1-hOff);
-  a.droneOscs.forEach(o=>{
-    const b=o.frequency.value<60?dp*0.5:dp;
-    o.frequency.setTargetAtTime(b,now,0.3);
-  });
+  // ── Drone ──
+  if(indoor){
+    // Indoor: energy center-of-mass drives drone pitch
+    // CoM 0 (top) → higher drone, CoM 1 (bottom) → lower
+    const comOffset=(smoothEnergyCoM-0.5)*0.2; // ±10%
+    const dp=DRONE_BASE*(1+comOffset);
+    a.droneOscs.forEach(o=>{
+      const b=o.frequency.value<60?dp*0.5:dp;
+      o.frequency.setTargetAtTime(b,now,0.5); // slower tracking indoors
+    });
+  } else {
+    const hOff=(smoothHorizon-0.5)*0.15;
+    const dp=DRONE_BASE*(1-hOff);
+    a.droneOscs.forEach(o=>{
+      const b=o.frequency.value<60?dp*0.5:dp;
+      o.frequency.setTargetAtTime(b,now,0.3);
+    });
+  }
   a.droneF.frequency.setTargetAtTime(420+globalEnergy*600,now,0.2);
 
   // Delay send toggle
@@ -633,18 +738,17 @@ function loop(){
   a.revSend.gain.setTargetAtTime(opt.reverb*0.7,now,0.15);
 
   // Voices
+  const pluckCD=indoor?16:8;
+  const pluckThresh=indoor?0.18:0.15;
   a.voices.forEach((vc,i)=>{
     let e=norm[i];
 
     // Color mode: weight energy by hue affinity
     if(opt.color && zoneSat[i]>0.12){
       const hu=zoneHue[i];
-      // warmness: 0-1 (warm hues near 0/360, cool near 180)
       const warmness=1-Math.min(Math.abs(hu-0),Math.abs(hu-360),Math.abs(360-hu))/180;
       const blend=warmness*SCALE[i].warm+(1-warmness)*SCALE[i].cool;
-      e*=(0.4+blend*0.8); // bias energy by color affinity
-
-      // Saturation modulates FM depth
+      e*=(0.4+blend*0.8);
       const satBoost=0.5+zoneSat[i]*2.0;
       const newDepth=vc.baseModDepth*(0.3+e*satBoost);
       vc.modD.gain.setTargetAtTime(newDepth,now,0.1);
@@ -660,9 +764,9 @@ function loop(){
     vc.energy=tg;
 
     // Pluck trigger
-    if(opt.pluck && deltas[i]>0.15 && pluckCooldown[i]<=0){
+    if(opt.pluck && deltas[i]>pluckThresh && pluckCooldown[i]<=0){
       a.firePluck(SCALE[i].freq, Math.min(1,deltas[i]*2.5));
-      pluckCooldown[i]=8; // ~8 frames cooldown (~270ms at 30fps)
+      pluckCooldown[i]=pluckCD;
     }
     if(pluckCooldown[i]>0) pluckCooldown[i]--;
   });
@@ -673,7 +777,19 @@ function loop(){
   a.padF.frequency.setTargetAtTime(600+globalEnergy*1800,now,0.3);
 
   // ── Visuals ──
-  hLine.style.top=(smoothHorizon*100)+"%";
+  // Hide safe zone guides in indoor mode
+  safeZone.style.opacity=indoor?"0":"1";
+  labelS.style.opacity=indoor?"0":"1";
+
+  if(indoor){
+    // Show energy CoM as the guide line instead of horizon
+    hLine.style.top=(smoothEnergyCoM*100)+"%";
+    hLine.style.background="rgba(100,200,255,0.35)";
+  } else {
+    hLine.style.top=(smoothHorizon*100)+"%";
+    hLine.style.background="rgba(255,180,0,0.4)";
+  }
+
   const slG=8+globalEnergy*35,slA=0.3+globalEnergy*0.5;
   sLine.style.boxShadow=`0 0 ${slG}px rgba(255,0,255,${slA}),0 0 ${slG*2.5}px rgba(255,0,255,${slA*0.3})`;
 
@@ -683,7 +799,6 @@ function loop(){
     nr.bar.style.width=Math.max(2,e*50)+"px";
     nr.bar.style.height=Math.max(2,3+e*12)+"px";
 
-    // Color the bar by zone hue if color mode
     let cr=255,cg=Math.floor(120+e*135),cb=Math.floor(220-e*180);
     if(opt.color && zoneSat[i]>0.15){
       const hu=zoneHue[i];
@@ -713,6 +828,7 @@ async function start(){
     bgModel=[];smoothHorizon=0.5;smoothEnergies=new Array(SCALE.length).fill(0);
     prevColLum=null;prevColDelta=null;globalEnergy=0;
     pluckCooldown=new Array(SCALE.length).fill(0);
+    smoothEnergyCoM=0.5;zoneMeans=new Array(SCALE.length).fill(128);
     zoneHue=new Array(SCALE.length).fill(0);zoneSat=new Array(SCALE.length).fill(0);
     document.body.classList.add("running");
     raf=requestAnimationFrame(loop);
