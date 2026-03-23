@@ -109,6 +109,15 @@ box-shadow:0 1px 3px rgba(0,0,0,.3)}
 height:3px;border-radius:2px;background:rgba(255,255,255,.1);outline:none}
 .setting-slider::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;
 border-radius:8px;background:rgba(255,0,255,.6);border:2px solid rgba(255,200,255,.5);cursor:pointer}
+
+.seg-ctrl{display:flex;gap:0;border-radius:6px;overflow:hidden;border:1px solid rgba(255,0,255,.2)}
+.seg-opt{flex:1;padding:6px 0;font-size:10px;letter-spacing:.5px;text-align:center;
+background:rgba(255,255,255,.04);color:rgba(255,200,255,.45);border:none;
+font-family:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent;
+border-right:1px solid rgba(255,0,255,.1);transition:background .15s,color .15s}
+.seg-opt:last-child{border-right:none}
+.seg-opt.seg-active{background:rgba(255,0,255,.2);color:rgba(255,200,255,.9)}
+.seg-opt:active{background:rgba(255,0,255,.15)}
 </style>
 
 </head>
@@ -150,13 +159,15 @@ border-radius:8px;background:rgba(255,0,255,.6);border:2px solid rgba(255,200,25
         <label class="toggle"><input type="checkbox" id="opt-color" checked>
           <div class="track"></div><div class="thumb"></div></label>
       </div>
-      <div class="setting-row">
-        <div>
-          <div class="setting-name">Drone</div>
-          <div class="setting-hint">Continuous bass tone</div>
+      <div class="setting-row" style="flex-direction:column;align-items:stretch">
+        <div class="setting-name">Drone Mode</div>
+        <div class="setting-hint" style="margin-bottom:8px">Classic = oscillators · Reactive = ducks under voices · Texture = filtered noise</div>
+        <div class="seg-ctrl" id="drone-mode-ctrl">
+          <button class="seg-opt" data-val="classic">Classic</button>
+          <button class="seg-opt seg-active" data-val="reactive">Reactive</button>
+          <button class="seg-opt" data-val="texture">Texture</button>
+          <button class="seg-opt" data-val="off">Off</button>
         </div>
-        <label class="toggle"><input type="checkbox" id="opt-drone" checked>
-          <div class="track"></div><div class="thumb"></div></label>
       </div>
       <div class="setting-row">
         <div>
@@ -255,7 +266,10 @@ const SCAN_COLS=5;
 // ── Settings (live-read each frame) ────────────────────────────
 const opt = {
   get indoor()   { return document.getElementById("opt-indoor").checked },
-  get drone()    { return document.getElementById("opt-drone").checked },
+  get droneMode() {
+    const active=document.querySelector("#drone-mode-ctrl .seg-active");
+    return active?active.dataset.val:"reactive";
+  },
   get color()    { return document.getElementById("opt-color").checked },
   get pluck()    { return document.getElementById("opt-pluck").checked },
   get delay()    { return document.getElementById("opt-delay").checked },
@@ -315,6 +329,14 @@ document.addEventListener("click",e=>{
   }
 });
 
+// Segmented control handler
+document.getElementById("drone-mode-ctrl").addEventListener("click",e=>{
+  const btn=e.target.closest(".seg-opt");
+  if(!btn) return;
+  document.querySelectorAll("#drone-mode-ctrl .seg-opt").forEach(b=>b.classList.remove("seg-active"));
+  btn.classList.add("seg-active");
+});
+
 // Note indicators
 const noteRows=SCALE.map((n,i)=>{
   const row=document.createElement("div");row.className="note-row";
@@ -363,27 +385,78 @@ function buildAudio(){
 
   const dry=ctx.createGain();dry.gain.value=0.45;dry.connect(master);
 
-  // Drone
-  const droneG=ctx.createGain();droneG.gain.value=0;
+  // ── Drone (3 modes sharing common output) ──
+  const droneOut=ctx.createGain();droneOut.gain.value=0;
   const droneF=ctx.createBiquadFilter();
-  droneF.type="lowpass";droneF.frequency.value=420;droneF.Q.value=1.2;
-  const droneOscs=[
-    {type:"triangle",det:0},{type:"triangle",det:4},{type:"triangle",det:-4},
-    {type:"sine",det:0,sub:true}
-  ].map(({type,det,sub})=>{
+  droneF.type="lowpass";droneF.frequency.value=420;droneF.Q.value=1.0;
+  droneOut.connect(droneF);droneF.connect(dry);droneF.connect(reverb);
+
+  // Mode 1: Classic — 2 detuned triangles, no sub (lighter than before)
+  const classicG=ctx.createGain();classicG.gain.value=0;
+  const classicOscs=[
+    {type:"triangle",det:0},{type:"triangle",det:5}
+  ].map(({type,det})=>{
     const o=ctx.createOscillator();o.type=type;
-    o.frequency.value=DRONE_BASE*(sub?0.5:1);o.detune.value=det;
-    const g=ctx.createGain();g.gain.value=sub?0.5:1;
-    o.connect(g);g.connect(droneG);o.start();return o;
+    o.frequency.value=DRONE_BASE;o.detune.value=det;
+    o.connect(classicG);o.start();return o;
   });
+  classicG.connect(droneOut);
+
+  // Mode 2: Reactive — same oscillators but gain inversely tracks voice energy
+  const reactiveG=ctx.createGain();reactiveG.gain.value=0;
+  const reactiveOscs=[
+    {type:"triangle",det:0},{type:"triangle",det:-4}
+  ].map(({type,det})=>{
+    const o=ctx.createOscillator();o.type=type;
+    o.frequency.value=DRONE_BASE;o.detune.value=det;
+    o.connect(reactiveG);o.start();return o;
+  });
+  reactiveG.connect(droneOut);
+
+  // Mode 3: Texture — filtered noise that breathes
+  const textureG=ctx.createGain();textureG.gain.value=0;
+  const textureBP=ctx.createBiquadFilter();
+  textureBP.type="bandpass";textureBP.frequency.value=DRONE_BASE*1.5;textureBP.Q.value=4;
+  const textureLP=ctx.createBiquadFilter();
+  textureLP.type="lowpass";textureLP.frequency.value=300;textureLP.Q.value=0.5;
+  // Noise source: looping buffer
+  const noiseLen=ctx.sampleRate*2;
+  const noiseBuf=ctx.createBuffer(1,noiseLen,ctx.sampleRate);
+  const noiseD=noiseBuf.getChannelData(0);
+  // Brown noise (integrated white noise) for low rumble
+  let bn=0;
+  for(let i=0;i<noiseLen;i++){
+    bn+=(Math.random()*2-1)*0.06;
+    bn*=0.998; // slight leak to prevent drift
+    noiseD[i]=bn;
+  }
+  const noiseSrc=ctx.createBufferSource();
+  noiseSrc.buffer=noiseBuf;noiseSrc.loop=true;
+  noiseSrc.connect(textureBP);textureBP.connect(textureLP);textureLP.connect(textureG);
+  textureG.connect(droneOut);
+  noiseSrc.start();
+
+  // Texture LFO — slow breathing on the bandpass frequency
+  const texLfo=ctx.createOscillator();texLfo.type="sine";texLfo.frequency.value=0.06;
+  const texLfoD=ctx.createGain();texLfoD.gain.value=60;
+  texLfo.connect(texLfoD);texLfoD.connect(textureBP.frequency);texLfo.start();
+
+  // Shared LFO on output filter
   const lfo=ctx.createOscillator();lfo.type="sine";lfo.frequency.value=0.08;
-  const lfoD=ctx.createGain();lfoD.gain.value=160;
+  const lfoD=ctx.createGain();lfoD.gain.value=120;
   lfo.connect(lfoD);lfoD.connect(droneF.frequency);lfo.start();
-  const trem=ctx.createOscillator();trem.type="sine";trem.frequency.value=0.25;
-  const tremD=ctx.createGain();tremD.gain.value=0.015;
-  trem.connect(tremD);tremD.connect(droneG.gain);trem.start();
-  droneG.connect(droneF);droneF.connect(dry);droneF.connect(reverb);
-  droneG.gain.setTargetAtTime(0.10,ctx.currentTime+0.1,1.0);
+
+  // All drone oscillators (for pitch updates)
+  const droneOscs=[...classicOscs,...reactiveOscs];
+
+  // Ramp in gently
+  droneOut.gain.setTargetAtTime(0.12,ctx.currentTime+0.1,1.0);
+
+  // Drone mode control object
+  const drone={
+    out:droneOut,filt:droneF,classicG,reactiveG,textureG,
+    textureBP,textureLP,oscs:droneOscs,noiseSrc,texLfo
+  };
 
   // Voices — FM + stereo
   const voices=SCALE.map(({freq},idx)=>{
@@ -510,7 +583,7 @@ function buildAudio(){
     }
   }
 
-  return{ctx,dry,reverb,revSend,dlSend,dlOut,droneG,droneOscs,droneF,lfo,trem,
+  return{ctx,dry,reverb,revSend,dlSend,dlOut,drone,lfo,
     voices,padG,padF,padOscs,firePluck,pluckVoices};
 }
 
@@ -741,26 +814,58 @@ function loop(){
 
   const a=audio,now=a.ctx.currentTime;
 
-  // ── Drone ──
+  // ── Drone (3-mode) ──
+  const dm=opt.droneMode;
+  const d=a.drone;
+
+  // Update pitch for oscillator-based modes
+  let dp=DRONE_BASE;
   if(indoor){
-    // Indoor: energy center-of-mass drives drone pitch
-    // CoM 0 (top) → higher drone, CoM 1 (bottom) → lower
-    const comOffset=(smoothEnergyCoM-0.5)*0.2; // ±10%
-    const dp=DRONE_BASE*(1+comOffset);
-    a.droneOscs.forEach(o=>{
-      const b=o.frequency.value<60?dp*0.5:dp;
-      o.frequency.setTargetAtTime(b,now,0.5); // slower tracking indoors
-    });
+    const comOffset=(smoothEnergyCoM-0.5)*0.2;
+    dp=DRONE_BASE*(1+comOffset);
   } else {
     const hOff=(smoothHorizon-0.5)*0.15;
-    const dp=DRONE_BASE*(1-hOff);
-    a.droneOscs.forEach(o=>{
-      const b=o.frequency.value<60?dp*0.5:dp;
-      o.frequency.setTargetAtTime(b,now,0.3);
-    });
+    dp=DRONE_BASE*(1-hOff);
   }
-  a.droneF.frequency.setTargetAtTime(420+globalEnergy*600,now,0.2);
-  a.droneG.gain.setTargetAtTime(opt.drone?0.10:0,now,opt.drone?0.3:0.15);
+  const pitchTC=indoor?0.5:0.3;
+  d.oscs.forEach(o=>o.frequency.setTargetAtTime(dp,now,pitchTC));
+
+  // Texture: shift bandpass center with pitch
+  d.textureBP.frequency.setTargetAtTime(dp*1.5,now,0.5);
+
+  // Filter opens with energy (all modes)
+  d.filt.frequency.setTargetAtTime(300+globalEnergy*400,now,0.2);
+
+  // Mode gains — only active mode gets volume
+  if(dm==="off"){
+    d.classicG.gain.setTargetAtTime(0,now,0.15);
+    d.reactiveG.gain.setTargetAtTime(0,now,0.15);
+    d.textureG.gain.setTargetAtTime(0,now,0.15);
+    d.out.gain.setTargetAtTime(0,now,0.15);
+  } else {
+    d.out.gain.setTargetAtTime(0.12,now,0.3);
+
+    // Classic: constant level
+    d.classicG.gain.setTargetAtTime(dm==="classic"?1:0,now,0.2);
+
+    // Reactive: inverse of voice energy — loud when sparse, quiet when busy
+    if(dm==="reactive"){
+      const reactLevel=Math.max(0.08, 1.0-globalEnergy*2.5);
+      d.reactiveG.gain.setTargetAtTime(reactLevel,now,0.12);
+    } else {
+      d.reactiveG.gain.setTargetAtTime(0,now,0.2);
+    }
+
+    // Texture: breathes with inverse energy + color shifts LP
+    if(dm==="texture"){
+      const texLevel=Math.max(0.15, 1.0-globalEnergy*1.8);
+      d.textureG.gain.setTargetAtTime(texLevel,now,0.15);
+      // Warmer scenes open the LP a touch
+      d.textureLP.frequency.setTargetAtTime(200+sceneWarmth*200+globalEnergy*100,now,0.3);
+    } else {
+      d.textureG.gain.setTargetAtTime(0,now,0.2);
+    }
+  }
 
   // Delay send toggle
   a.dlOut.gain.setTargetAtTime(opt.delay?0.35:0,now,0.1);
@@ -914,8 +1019,10 @@ function stop(){
   if(raf) cancelAnimationFrame(raf);
   if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}
   if(audio){
-    audio.droneOscs.forEach(o=>{try{o.stop()}catch(e){}});
-    audio.lfo.stop();audio.trem.stop();
+    audio.drone.oscs.forEach(o=>{try{o.stop()}catch(e){}});
+    try{audio.drone.noiseSrc.stop()}catch(e){}
+    try{audio.drone.texLfo.stop()}catch(e){}
+    audio.lfo.stop();
     audio.voices.forEach(v=>{try{v.car.stop();v.mod.stop();v.shim.stop();v.fifth.stop()}catch(e){}});
     audio.padOscs.forEach(o=>{try{o.stop()}catch(e){}});
     audio.pluckVoices.forEach(p=>{try{p.fund.stop();p.oct.stop();p.third.stop()}catch(e){}});
