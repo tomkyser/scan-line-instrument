@@ -315,30 +315,30 @@ function buildAudio(){
   const ctx=new(window.AudioContext||window.webkitAudioContext)();
 
   const comp=ctx.createDynamicsCompressor();
-  comp.threshold.value=-20;comp.knee.value=10;comp.ratio.value=5;
-  comp.attack.value=0.003;comp.release.value=0.12;
+  comp.threshold.value=-24;comp.knee.value=6;comp.ratio.value=12;
+  comp.attack.value=0.002;comp.release.value=0.08;
   comp.connect(ctx.destination);
 
-  const master=ctx.createGain();master.gain.value=0.8;master.connect(comp);
+  const master=ctx.createGain();master.gain.value=0.5;master.connect(comp);
 
   // Reverb
   const reverb=ctx.createConvolver();reverb.buffer=makeIR(ctx,3.5,1.8,0.6);
-  const revSend=ctx.createGain();revSend.gain.value=0.40;
+  const revSend=ctx.createGain();revSend.gain.value=0.30;
   reverb.connect(revSend);revSend.connect(master);
 
   // Delay
   const dlL=ctx.createDelay(2);dlL.delayTime.value=0.375;
   const dlR=ctx.createDelay(2);dlR.delayTime.value=0.5;
-  const dlFb=ctx.createGain();dlFb.gain.value=0.30;
-  const dlSend=ctx.createGain();dlSend.gain.value=0.20;
-  const dlOut=ctx.createGain();dlOut.gain.value=0.35;
+  const dlFb=ctx.createGain();dlFb.gain.value=0.25;
+  const dlSend=ctx.createGain();dlSend.gain.value=0.15;
+  const dlOut=ctx.createGain();dlOut.gain.value=0.25;
   const dlFilt=ctx.createBiquadFilter();dlFilt.type="lowpass";dlFilt.frequency.value=2200;
   dlSend.connect(dlL);dlL.connect(dlFilt);dlFilt.connect(dlR);
   dlR.connect(dlFb);dlFb.connect(dlL);
   dlL.connect(dlOut);dlR.connect(dlOut);
   dlOut.connect(master);dlOut.connect(reverb);
 
-  const dry=ctx.createGain();dry.gain.value=0.60;dry.connect(master);
+  const dry=ctx.createGain();dry.gain.value=0.45;dry.connect(master);
 
   // Drone
   const droneG=ctx.createGain();droneG.gain.value=0;
@@ -360,7 +360,7 @@ function buildAudio(){
   const tremD=ctx.createGain();tremD.gain.value=0.015;
   trem.connect(tremD);tremD.connect(droneG.gain);trem.start();
   droneG.connect(droneF);droneF.connect(dry);droneF.connect(reverb);
-  droneG.gain.setTargetAtTime(0.16,ctx.currentTime+0.1,1.0);
+  droneG.gain.setTargetAtTime(0.10,ctx.currentTime+0.1,1.0);
 
   // Voices — FM
   const voices=SCALE.map(({freq})=>{
@@ -405,7 +405,7 @@ function buildAudio(){
 
   function firePluck(freq, velocity){
     const now=ctx.currentTime;
-    const vol=velocity*opt.pluckVol*0.30;
+    const vol=velocity*opt.pluckVol*0.18;
     const dur=1.4+velocity*0.6; // 1.4-2.0s tail
 
     // ── Fundamental (sine, slight pitch bend down on attack) ──
@@ -757,7 +757,7 @@ function loop(){
       vc.modD.gain.setTargetAtTime(newDepth,now,0.1);
     }
 
-    const tg=e*0.18;
+    const tg=e*0.10;
     const tc=tg>vc.energy?0.04:0.8;
     vc.gain.gain.setTargetAtTime(tg,now,tc);
     vc.filt.frequency.setTargetAtTime(Math.min(vc.freq*(2+e*6),8000),now,0.08);
@@ -772,7 +772,7 @@ function loop(){
   });
 
   // Pad
-  const padTarget=opt.pad?globalEnergy*0.06:0;
+  const padTarget=opt.pad?globalEnergy*0.04:0;
   a.padG.gain.setTargetAtTime(padTarget,now,0.5);
   a.padF.frequency.setTargetAtTime(600+globalEnergy*1800,now,0.3);
 
