@@ -182,6 +182,14 @@ border-radius:8px;background:rgba(255,0,255,.6);border:2px solid rgba(255,200,25
         <label class="toggle"><input type="checkbox" id="opt-pad" checked>
           <div class="track"></div><div class="thumb"></div></label>
       </div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-name">Adaptive Scale</div>
+          <div class="setting-hint">Warm scenes → major, cool → minor</div>
+        </div>
+        <label class="toggle"><input type="checkbox" id="opt-adapt" checked>
+          <div class="track"></div><div class="thumb"></div></label>
+      </div>
     </div>
     <div class="setting-group">
       <div class="setting-group-label">Mix</div>
@@ -218,24 +226,27 @@ border-radius:8px;background:rgba(255,0,255,.6);border:2px solid rgba(255,200,25
 </div>
 
 <script>
-// ── Scale ──────────────────────────────────────────────────────
+// ── Scale (warm = Bb major penta, cool = F minor penta) ───────
 const SCALE = [
-  { note:"F2",  freq:87.31,  warm:1.0, cool:0.2 },
-  { note:"Bb2", freq:116.54, warm:0.9, cool:0.3 },
-  { note:"C3",  freq:130.81, warm:0.7, cool:0.5 },
-  { note:"D3",  freq:146.83, warm:0.8, cool:0.4 },
-  { note:"F3",  freq:174.61, warm:0.9, cool:0.3 },
-  { note:"G3",  freq:196.00, warm:0.6, cool:0.6 },
-  { note:"Bb3", freq:233.08, warm:0.5, cool:0.7 },
-  { note:"C4",  freq:261.63, warm:0.4, cool:0.7 },
-  { note:"D4",  freq:293.66, warm:0.5, cool:0.6 },
-  { note:"F4",  freq:349.23, warm:0.3, cool:0.8 },
-  { note:"G4",  freq:392.00, warm:0.3, cool:0.9 },
-  { note:"Bb4", freq:466.16, warm:0.2, cool:1.0 },
-  { note:"C5",  freq:523.25, warm:0.2, cool:0.9 },
-  { note:"D5",  freq:587.33, warm:0.3, cool:0.8 },
-  { note:"F5",  freq:698.46, warm:0.2, cool:1.0 },
+  { note:"F2",  freq:87.31,  coolFreq:87.31,  warm:1.0, cool:0.2 },
+  { note:"Bb2", freq:116.54, coolFreq:116.54, warm:0.9, cool:0.3 },
+  { note:"C3",  freq:130.81, coolFreq:130.81, warm:0.7, cool:0.5 },
+  { note:"D3",  freq:146.83, coolFreq:155.56, warm:0.8, cool:0.4 },
+  { note:"F3",  freq:174.61, coolFreq:174.61, warm:0.9, cool:0.3 },
+  { note:"G3",  freq:196.00, coolFreq:207.65, warm:0.6, cool:0.6 },
+  { note:"Bb3", freq:233.08, coolFreq:233.08, warm:0.5, cool:0.7 },
+  { note:"C4",  freq:261.63, coolFreq:261.63, warm:0.4, cool:0.7 },
+  { note:"D4",  freq:293.66, coolFreq:311.13, warm:0.5, cool:0.6 },
+  { note:"F4",  freq:349.23, coolFreq:349.23, warm:0.3, cool:0.8 },
+  { note:"G4",  freq:392.00, coolFreq:415.30, warm:0.3, cool:0.9 },
+  { note:"Bb4", freq:466.16, coolFreq:466.16, warm:0.2, cool:1.0 },
+  { note:"C5",  freq:523.25, coolFreq:523.25, warm:0.2, cool:0.9 },
+  { note:"D5",  freq:587.33, coolFreq:622.25, warm:0.3, cool:0.8 },
+  { note:"F5",  freq:698.46, coolFreq:698.46, warm:0.2, cool:1.0 },
 ];
+// Mutable note names for display when scale shifts
+const noteLabels=SCALE.map(s=>s.note);
+const coolLabels=["F2","Bb2","C3","Eb3","F3","Ab3","Bb3","C4","Eb4","F4","Ab4","Bb4","C5","Eb5","F5"];
 
 const DRONE_BASE=87.31, SCAN_X=0.62, SAFE_TOP=0.28, SAFE_BOT=0.72;
 const PW=320, PH=240, HORIZON_SM=0.91, BG_RATE=0.008;
@@ -249,6 +260,7 @@ const opt = {
   get pluck()    { return document.getElementById("opt-pluck").checked },
   get delay()    { return document.getElementById("opt-delay").checked },
   get pad()      { return document.getElementById("opt-pad").checked },
+  get adapt()    { return document.getElementById("opt-adapt").checked },
   get reverb()   { return document.getElementById("opt-reverb").value / 100 },
   get sens()     { return document.getElementById("opt-sens").value / 100 },
   get pluckVol() { return document.getElementById("opt-pluck-vol").value / 100 },
@@ -263,6 +275,8 @@ let zoneHue=new Array(SCALE.length).fill(0);
 let zoneSat=new Array(SCALE.length).fill(0);
 let smoothEnergyCoM=0.5; // indoor: energy center-of-mass for drone
 let zoneMeans=new Array(SCALE.length).fill(128); // for indoor edge detection
+let sceneWarmth=0.65; // 0=cool, 1=warm, starts slightly warm
+let currentFreqs=SCALE.map(s=>s.freq); // live frequencies (lerped by warmth)
 
 // ── DOM ────────────────────────────────────────────────────────
 const videoEl=document.getElementById("video-el");
@@ -371,8 +385,8 @@ function buildAudio(){
   droneG.connect(droneF);droneF.connect(dry);droneF.connect(reverb);
   droneG.gain.setTargetAtTime(0.10,ctx.currentTime+0.1,1.0);
 
-  // Voices — FM
-  const voices=SCALE.map(({freq})=>{
+  // Voices — FM + stereo
+  const voices=SCALE.map(({freq},idx)=>{
     const car=ctx.createOscillator();car.type="sine";car.frequency.value=freq;
     const mod=ctx.createOscillator();mod.type="sine";
     const ratio=freq<200?1:freq<400?2:3;
@@ -390,12 +404,19 @@ function buildAudio(){
     const filt=ctx.createBiquadFilter();
     filt.type="lowpass";filt.frequency.value=freq*2;filt.Q.value=0.7;
 
+    // Stereo panner: lowest note = -0.35, highest = +0.35
+    const pan=ctx.createStereoPanner();
+    const panVal=(idx/(SCALE.length-1))*0.7-0.35; // -0.35 to +0.35
+    pan.pan.value=panVal;
+
     car.connect(gain);shimG.connect(gain);fifthG.connect(gain);
     gain.connect(filt);
-    filt.connect(dry);filt.connect(reverb);filt.connect(dlSend);
+    filt.connect(pan);
+    pan.connect(dry);pan.connect(reverb);pan.connect(dlSend);
 
     car.start();mod.start();shim.start();fifth.start();
-    return{car,mod,modD,shim,fifth,gain,filt,energy:0,freq,baseModDepth:modD.gain.value};
+    return{car,mod,modD,shim,fifth,gain,filt,pan,energy:0,freq,
+      modRatio:ratio,baseModDepth:modD.gain.value,currentFreq:freq};
   });
 
   // Pad
@@ -750,7 +771,39 @@ function loop(){
   // Voices
   const pluckCD=indoor?16:8;
   const pluckThresh=indoor?0.18:0.15;
+
+  // ── Adaptive scale: compute scene warmth from zone hues ──
+  if(opt.adapt){
+    let warmSum=0,warmCnt=0;
+    for(let i=0;i<SCALE.length;i++){
+      if(zoneSat[i]>0.1){
+        const hu=zoneHue[i];
+        // warm hues: reds/oranges/yellows (0-80, 290-360) → warmness near 1
+        // cool hues: blues/cyans/greens (120-270) → warmness near 0
+        const w=1-Math.min(Math.abs(hu-0),Math.abs(hu-360),Math.abs(360-hu))/180;
+        warmSum+=w;warmCnt++;
+      }
+    }
+    const rawWarm=warmCnt>0?warmSum/warmCnt:0.65;
+    sceneWarmth=sceneWarmth*0.993+rawWarm*0.007; // very slow ~5-10s settling
+  } else {
+    sceneWarmth=sceneWarmth*0.99+0.65*0.01; // drift back to default warm
+  }
+
+  // Retune voices based on warmth
   a.voices.forEach((vc,i)=>{
+    const warmF=SCALE[i].freq;
+    const coolF=SCALE[i].coolFreq;
+    const targetF=coolF+(warmF-coolF)*sceneWarmth;
+    if(Math.abs(targetF-vc.currentFreq)>0.1){
+      vc.car.frequency.setTargetAtTime(targetF,now,0.8);
+      vc.mod.frequency.setTargetAtTime(targetF*vc.modRatio,now,0.8);
+      vc.shim.frequency.setTargetAtTime(targetF*2.01,now,0.8);
+      vc.fifth.frequency.setTargetAtTime(targetF*1.498,now,0.8);
+      vc.currentFreq=targetF;
+      currentFreqs[i]=targetF;
+    }
+
     let e=norm[i];
 
     // Color mode: weight energy by hue affinity
@@ -770,12 +823,12 @@ function loop(){
     const tg=e*0.10;
     const tc=tg>vc.energy?0.04:0.8;
     vc.gain.gain.setTargetAtTime(tg,now,tc);
-    vc.filt.frequency.setTargetAtTime(Math.min(vc.freq*(2+e*6),8000),now,0.08);
+    vc.filt.frequency.setTargetAtTime(Math.min(vc.currentFreq*(2+e*6),8000),now,0.08);
     vc.energy=tg;
 
-    // Pluck trigger
+    // Pluck trigger (use current tuned frequency)
     if(opt.pluck && deltas[i]>pluckThresh && pluckCooldown[i]<=0){
-      a.firePluck(SCALE[i].freq, Math.min(1,deltas[i]*2.5));
+      a.firePluck(currentFreqs[i], Math.min(1,deltas[i]*2.5));
       pluckCooldown[i]=pluckCD;
     }
     if(pluckCooldown[i]>0) pluckCooldown[i]--;
@@ -819,6 +872,12 @@ function loop(){
     nr.bar.style.background=`rgba(${cr},${cg},${cb},${(0.3+e*0.7).toFixed(2)})`;
     nr.bar.style.boxShadow=e>0.15?`0 0 ${(e*16).toFixed(0)}px rgba(${cr},${cg},${cb},${(e*0.6).toFixed(2)})`:"none";
     nr.lbl.style.color=`rgba(255,200,255,${(0.2+e*0.8).toFixed(2)})`;
+    // Update label if scale shifted
+    if(opt.adapt && SCALE[i].freq!==SCALE[i].coolFreq){
+      nr.lbl.textContent=sceneWarmth>0.5?SCALE[i].note:coolLabels[i];
+    } else {
+      nr.lbl.textContent=SCALE[i].note;
+    }
   }
 
   renderGlow(norm,globalEnergy);
@@ -839,6 +898,7 @@ async function start(){
     prevColLum=null;prevColDelta=null;globalEnergy=0;
     pluckCooldown=new Array(SCALE.length).fill(0);
     smoothEnergyCoM=0.5;zoneMeans=new Array(SCALE.length).fill(128);
+    sceneWarmth=0.65;currentFreqs=SCALE.map(s=>s.freq);
     zoneHue=new Array(SCALE.length).fill(0);zoneSat=new Array(SCALE.length).fill(0);
     document.body.classList.add("running");
     raf=requestAnimationFrame(loop);
