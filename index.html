@@ -32,6 +32,20 @@ letter-spacing:3px;text-transform:uppercase;cursor:pointer;font-family:inherit;
 left:50%;transform:translateX(-50%);padding:10px 32px;font-size:13px;
 border-radius:8px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:30}
 
+.btn-rec{position:absolute;bottom:max(28px,env(safe-area-inset-bottom,28px));
+right:16px;padding:10px 16px;font-size:12px;letter-spacing:2px;
+border-radius:8px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:30;
+display:flex;align-items:center;gap:6px}
+.btn-rec.recording{border-color:rgba(255,60,60,.6);background:rgba(255,30,30,.15)}
+.rec-dot{width:8px;height:8px;border-radius:50%;background:rgba(255,60,60,.7);flex-shrink:0}
+.btn-rec.recording .rec-dot{animation:pulse-dot 1s ease infinite}
+@keyframes pulse-dot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(0.7)}}
+
+.rec-timer{position:absolute;bottom:max(76px,calc(env(safe-area-inset-bottom,28px)+48px));
+right:16px;font-size:11px;letter-spacing:1px;color:rgba(255,60,60,.7);z-index:30;
+text-align:center;min-width:60px;display:none;pointer-events:none}
+body.recording .rec-timer{display:block}
+
 #camera-canvas{position:absolute;inset:0;width:100%;height:100%}
 #process-canvas{display:none}
 #video-el{position:absolute;opacity:0;pointer-events:none;width:1px;height:1px}
@@ -220,6 +234,11 @@ border-right:1px solid rgba(255,0,255,.1);transition:background .15s,color .15s}
   </div>
 
 <button class="btn btn-stop running-only" id="stop-btn">■ stop</button>
+<button class="btn btn-rec running-only" id="rec-btn">
+<span class="rec-dot"></span><span id="rec-label">rec</span>
+</button>
+
+  <div class="rec-timer running-only" id="rec-timer">00:00</div>
 
   <div id="start-screen">
     <div class="line"></div>
@@ -363,6 +382,10 @@ function buildAudio(){
   comp.threshold.value=-24;comp.knee.value=6;comp.ratio.value=12;
   comp.attack.value=0.002;comp.release.value=0.08;
   comp.connect(ctx.destination);
+
+  // Recording tap — mirrors output to a capturable stream
+  const recDest=ctx.createMediaStreamDestination();
+  comp.connect(recDest);
 
   const master=ctx.createGain();master.gain.value=0.5;master.connect(comp);
 
@@ -583,7 +606,7 @@ function buildAudio(){
     }
   }
 
-  return{ctx,dry,reverb,revSend,dlSend,dlOut,drone,lfo,
+  return{ctx,dry,reverb,revSend,dlSend,dlOut,drone,lfo,recDest,
     voices,padG,padF,padOscs,firePluck,pluckVoices};
 }
 
@@ -986,6 +1009,16 @@ function loop(){
   }
 
   renderGlow(norm,globalEnergy);
+
+  // During recording, composite overlays onto camera canvas for capture
+  if(recorder && recorder.state==="recording"){
+    // Draw glow
+    camCtx.drawImage(glowC,0,0);
+    // Draw scan line
+    const sx=Math.floor(camC.width*SCAN_X);
+    camCtx.fillStyle=`rgba(255,0,255,${0.5+globalEnergy*0.3})`;
+    camCtx.fillRect(sx-1,0,2,camC.height);
+  }
   raf=requestAnimationFrame(loop);
 }
 
@@ -1016,6 +1049,7 @@ async function start(){
 }
 
 function stop(){
+  if(recorder) stopRec(false); // stop recording without saving if full stop
   if(raf) cancelAnimationFrame(raf);
   if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}
   if(audio){
@@ -1030,8 +1064,130 @@ function stop(){
   }
   bgModel=[];prevColLum=null;prevColDelta=null;
   document.body.classList.remove("running");
+  document.body.classList.remove("recording");
   document.getElementById("start-screen").style.display="flex";
 }
+
+// ── Recording ──────────────────────────────────────────────────
+let recorder=null, recChunks=[], recTimer=null, recStart=0;
+const MAX_REC=60; // seconds
+const recBtn=document.getElementById("rec-btn");
+const recLabel=document.getElementById("rec-label");
+const recTimerEl=document.getElementById("rec-timer");
+
+function pickMime(){
+  // Safari prefers mp4, Chrome prefers webm
+  const types=["video/mp4","video/webm;codecs=vp8,opus","video/webm"];
+  for(const t of types) if(MediaRecorder.isTypeSupported(t)) return t;
+  // Fallback: audio only
+  const aTypes=["audio/mp4","audio/webm;codecs=opus","audio/webm"];
+  for(const t of aTypes) if(MediaRecorder.isTypeSupported(t)) return t;
+  return "";
+}
+
+function startRec(){
+  if(!audio||recorder) return;
+
+  const mime=pickMime();
+  if(!mime){
+    alert("Recording not supported in this browser.");
+    return;
+  }
+
+  recChunks=[];
+  const isVideo=mime.startsWith("video/");
+
+  let combined;
+  if(isVideo){
+    // Combine canvas video + audio
+    const canvasStream=camC.captureStream(30);
+    const audioStream=audio.recDest.stream;
+    combined=new MediaStream([
+      ...canvasStream.getVideoTracks(),
+      ...audioStream.getAudioTracks()
+    ]);
+  } else {
+    combined=audio.recDest.stream;
+  }
+
+  try{
+    recorder=new MediaRecorder(combined,{mimeType:mime,videoBitsPerSecond:2500000});
+  }catch(e){
+    console.error("MediaRecorder init failed:",e);
+    alert("Recording failed to start.");
+    return;
+  }
+
+  recorder.ondataavailable=e=>{if(e.data.size>0) recChunks.push(e.data);};
+  recorder.onstop=()=>{
+    if(recChunks.length>0) saveRec(mime,isVideo);
+    recorder=null;
+  };
+
+  recorder.start(1000); // collect chunks every second
+  recStart=Date.now();
+  document.body.classList.add("recording");
+  recBtn.classList.add("recording");
+  recLabel.textContent="stop";
+  updateRecTimer();
+  recTimer=setInterval(()=>{
+    updateRecTimer();
+    if((Date.now()-recStart)/1000>=MAX_REC) stopRec(true);
+  },500);
+}
+
+function stopRec(save){
+  if(!recorder) return;
+  clearInterval(recTimer);recTimer=null;
+  document.body.classList.remove("recording");
+  recBtn.classList.remove("recording");
+  recLabel.textContent="rec";
+  recTimerEl.textContent="00:00";
+
+  if(save!==false && recorder.state==="recording"){
+    recorder.stop(); // triggers onstop → saveRec
+  } else {
+    try{recorder.stop();}catch(e){}
+    recorder=null;recChunks=[];
+  }
+}
+
+function updateRecTimer(){
+  const elapsed=Math.floor((Date.now()-recStart)/1000);
+  const m=String(Math.floor(elapsed/60)).padStart(2,"0");
+  const s=String(elapsed%60).padStart(2,"0");
+  recTimerEl.textContent=m+":"+s;
+}
+
+function saveRec(mime,isVideo){
+  const ext=mime.includes("mp4")?"mp4":"webm";
+  const blob=new Blob(recChunks,{type:mime});
+  const url=URL.createObjectURL(blob);
+
+  // iOS Safari: try share sheet first (better UX for saving to camera roll)
+  if(navigator.share && navigator.canShare){
+    const file=new File([blob],`scanline-${Date.now()}.${ext}`,{type:mime});
+    if(navigator.canShare({files:[file]})){
+      navigator.share({files:[file],title:"Scan Line Recording"}).catch(()=>{
+        fallbackDownload(url,ext);
+      });
+      return;
+    }
+  }
+  fallbackDownload(url,ext);
+}
+
+function fallbackDownload(url,ext){
+  const a=document.createElement("a");
+  a.href=url;a.download=`scanline-${Date.now()}.${ext}`;
+  document.body.appendChild(a);a.click();
+  setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url);},1000);
+}
+
+recBtn.addEventListener("click",()=>{
+  if(recorder) stopRec(true);
+  else startRec();
+});
 
 document.getElementById("start-btn").addEventListener("click",start);
 document.getElementById("stop-btn").addEventListener("click",stop);
